@@ -132,7 +132,6 @@ let zoomX = 0;
 let zoomY = 0;
 
 function setupZoom(img, containerId) {
-  let lastTap = 0;
   let initialDistance = 0;
   let initialScale = 1;
 
@@ -142,24 +141,13 @@ function setupZoom(img, containerId) {
     toggleZoom(img, e.clientX, e.clientY);
   });
 
-  // Double-tap for touch
-  img.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTap < 300 && e.changedTouches.length === 1) {
-      e.preventDefault();
-      const touch = e.changedTouches[0];
-      toggleZoom(img, touch.clientX, touch.clientY);
-    }
-    lastTap = now;
-  });
-
   // Pinch to zoom
   img.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
       e.preventDefault();
       initialDistance = getDistance(e.touches[0], e.touches[1]);
       initialScale = zoomScale || 1;
-      zoomedImg = img; // Enable zoom mode on pinch start
+      zoomedImg = img;
     }
   }, { passive: false });
 
@@ -172,13 +160,11 @@ function setupZoom(img, containerId) {
       zoomedImg = img;
       applyZoom(img);
     } else if (e.touches.length === 1 && zoomedImg === img && zoomScale > 1) {
-      // Pan when zoomed
       e.preventDefault();
     }
   }, { passive: false });
 
   img.addEventListener('touchend', (e) => {
-    // Reset zoom if scale is back to 1
     if (zoomScale <= 1.05) {
       resetZoom();
     }
@@ -221,6 +207,85 @@ function resetZoom() {
     zoomedImg = null;
     zoomScale = 1;
   }
+}
+
+// Unified touch navigation - handles swipe and tap for iOS
+function setupTouchNav(img, prevFn, nextFn) {
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let lastTapTime = 0;
+
+  img.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+    }
+  }, { passive: true });
+
+  img.addEventListener('touchend', (e) => {
+    if (e.changedTouches.length !== 1) return;
+    if (zoomScale > 1) return; // Don't navigate when zoomed
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+    const now = Date.now();
+
+    // Check for double-tap to zoom
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20 && dt < 300) {
+      if (now - lastTapTime < 300) {
+        // Double tap - zoom
+        e.preventDefault();
+        toggleZoom(img, touch.clientX, touch.clientY);
+        lastTapTime = 0;
+        return;
+      }
+      lastTapTime = now;
+
+      // Single tap - wait briefly to see if it's a double tap
+      setTimeout(() => {
+        if (lastTapTime === now) {
+          // It was a single tap, navigate based on position
+          const rect = img.getBoundingClientRect();
+          const x = touch.clientX - rect.left;
+          const threshold = rect.width * 0.3;
+          if (x < threshold) {
+            prevFn();
+          } else {
+            nextFn();
+          }
+        }
+      }, 250);
+      return;
+    }
+
+    // Swipe detection (horizontal swipe > 50px, completed in < 500ms)
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && dt < 500) {
+      if (dx > 0) {
+        prevFn(); // Swipe right = prev
+      } else {
+        nextFn(); // Swipe left = next
+      }
+    }
+  }, { passive: false });
+
+  // Also support click for desktop
+  img.addEventListener('click', (e) => {
+    // Only handle if not a touch device or if it's a real mouse click
+    if (e.pointerType === 'mouse' || !('ontouchstart' in window)) {
+      const rect = img.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const threshold = rect.width * 0.3;
+      if (x < threshold) {
+        prevFn();
+      } else {
+        nextFn();
+      }
+    }
+  });
 }
 
 // Show current artwork in main gallery
@@ -348,63 +413,13 @@ function setupControls() {
     }
   });
 
-  // Touch swipe for main gallery
-  let touchStartX = 0;
-  galleryView.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-  }, { passive: true });
+  // Setup touch/tap handling for gallery
+  setupTouchNav(artworkImg, prev, next);
+  setupTouchNav(document.getElementById('album-artwork'), prevInAlbum, nextInAlbum);
 
-  galleryView.addEventListener('touchend', (e) => {
-    const diff = touchStartX - e.changedTouches[0].screenX;
-    if (Math.abs(diff) > 50) {
-      // Swipe left = prev, swipe right = next
-      if (diff > 0) prev();
-      else next();
-    }
-  }, { passive: true });
-
-  // Touch swipe for album detail
-  albumDetailView.addEventListener('touchstart', (e) => {
-    touchStartX = e.changedTouches[0].screenX;
-  }, { passive: true });
-
-  albumDetailView.addEventListener('touchend', (e) => {
-    const diff = touchStartX - e.changedTouches[0].screenX;
-    if (Math.abs(diff) > 50) {
-      // Swipe left = prev, swipe right = next
-      if (diff > 0) prevInAlbum();
-      else nextInAlbum();
-    }
-  }, { passive: true });
-
-  // Double-tap to zoom
+  // Setup zoom (pinch only, no double-tap conflicts)
   setupZoom(artworkImg, 'artwork-container');
   setupZoom(document.getElementById('album-artwork'), 'album-artwork-container');
-
-  // Tap left = prev, tap right = next (standard gallery behavior)
-  artworkImg.addEventListener('click', (e) => {
-    const rect = artworkImg.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const threshold = rect.width * 0.3; // Left 30% = prev
-    if (x < threshold) {
-      prev();
-    } else {
-      next();
-    }
-  });
-
-  // Same for album view
-  document.getElementById('album-artwork').addEventListener('click', (e) => {
-    const img = e.target;
-    const rect = img.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const threshold = rect.width * 0.3;
-    if (x < threshold) {
-      prevInAlbum();
-    } else {
-      nextInAlbum();
-    }
-  });
 
   // Navigation buttons
   statsBtn.addEventListener('click', showStats);
