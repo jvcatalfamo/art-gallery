@@ -6,6 +6,25 @@ const ALBUMS_KEY = 'artgallery_albums';
 const BACKUP_KEY = 'artgallery_backup_info';
 const DATA_FILE = './data/paintings.json';
 const BACKUP_REMINDER_THRESHOLD = 50; // Remind after 50 new artworks
+const API_KEY_STORAGE = 'artgallery_apikey';
+
+// AI prompts
+const LITERAL_PROMPT = `Describe what is literally depicted in this painting. Be specific about:
+- The scene, setting, and composition
+- People/figures (who they might be, what they're doing, their expressions)
+- Objects, animals, or symbolic elements
+- Colors, lighting, and atmosphere
+
+Keep it concise (2-3 short paragraphs). Focus on what you can SEE, not interpretations.`;
+
+const MEANING_PROMPT = `Provide insight into the deeper meaning and context of this painting:
+- What might the artist be expressing or exploring?
+- Historical/cultural context if relevant
+- Symbolism and hidden meanings
+- How this relates to the artist's life, style, or the art movement
+- Emotional resonance or themes
+
+Keep it thoughtful but concise (2-3 paragraphs). Make it interesting and illuminating.`;
 
 let paintings = [];
 let paintingsMap = {};
@@ -88,8 +107,8 @@ async function loadPaintings() {
 
 // Sorting functions
 function applySort() {
-  const unseenPaintings = paintings.filter(p => !seen.has(p.contentId));
-  const seenPaintings = paintings.filter(p => seen.has(p.contentId));
+  const unseenPaintings = paintings.filter(p => !seen.has(Number(p.contentId)));
+  const seenPaintings = paintings.filter(p => seen.has(Number(p.contentId)));
 
   switch (settings.sortOrder) {
     case 'random':
@@ -292,14 +311,14 @@ function setupTouchNav(img, prevFn, nextFn) {
 function showCurrentArtwork() {
   if (paintings.length === 0) return;
 
-  const unseenCount = paintings.filter(p => !seen.has(p.contentId)).length;
+  const unseenCount = paintings.filter(p => !seen.has(Number(p.contentId))).length;
   if (unseenCount === 0 && settings.sortOrder === 'unseen') {
     showCompleteMessage();
     return;
   }
 
   if (settings.sortOrder === 'unseen') {
-    while (currentIndex < orderedList.length && seen.has(orderedList[currentIndex].contentId)) {
+    while (currentIndex < orderedList.length && seen.has(Number(orderedList[currentIndex].contentId))) {
       currentIndex++;
     }
     if (currentIndex >= orderedList.length) {
@@ -312,7 +331,7 @@ function showCurrentArtwork() {
   const painting = orderedList[currentIndex];
   if (!painting) return;
 
-  seen.add(painting.contentId);
+  seen.add(Number(painting.contentId));
   saveSeen();
 
   loadingEl.textContent = 'Loading...';
@@ -718,31 +737,36 @@ function renderStats() {
   document.getElementById('overall-text').textContent =
     `${seenCount.toLocaleString()} / ${total.toLocaleString()} artworks seen (${percent}%)`;
 
-  // By artist
+  // By artist - only show artists where you've seen at least one, sorted by seen count
   const artistStats = {};
   for (const painting of paintings) {
     const artist = painting.artistName || 'Unknown';
     if (!artistStats[artist]) artistStats[artist] = { total: 0, seen: 0 };
     artistStats[artist].total++;
-    if (seen.has(painting.contentId)) artistStats[artist].seen++;
+    if (seen.has(Number(painting.contentId))) artistStats[artist].seen++;
   }
 
-  document.getElementById('artist-list').innerHTML = Object.entries(artistStats)
-    .sort((a, b) => b[1].total - a[1].total)
-    .map(([name, stats]) => {
-      const pct = (stats.seen / stats.total * 100).toFixed(0);
-      return `
-        <div class="artist-row">
-          <div class="artist-info">
-            <span class="artist-name">${name}</span>
-            <span class="artist-count">${stats.seen} / ${stats.total}</span>
+  // Filter to only artists with seen > 0, sort by seen count descending
+  const artistsWithSeen = Object.entries(artistStats)
+    .filter(([_, stats]) => stats.seen > 0)
+    .sort((a, b) => b[1].seen - a[1].seen);
+
+  document.getElementById('artist-list').innerHTML = artistsWithSeen.length > 0
+    ? artistsWithSeen.map(([name, stats]) => {
+        const pct = (stats.seen / stats.total * 100).toFixed(0);
+        return `
+          <div class="artist-row">
+            <div class="artist-info">
+              <span class="artist-name">${name}</span>
+              <span class="artist-count">${stats.seen} / ${stats.total}</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${pct}%"></div>
+            </div>
           </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: ${pct}%"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
+        `;
+      }).join('')
+    : '<p style="color: #666;">No artists seen yet</p>';
 }
 
 // LocalStorage
@@ -750,7 +774,9 @@ function loadSeen() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
-      seen = new Set(JSON.parse(data));
+      // Ensure all IDs are numbers for consistent comparison
+      const ids = JSON.parse(data).map(id => Number(id));
+      seen = new Set(ids);
       console.log(`Loaded ${seen.size} seen artworks`);
     }
   } catch (e) {
@@ -955,5 +981,132 @@ function setupBackupControls() {
   updateBackupDisplay();
 }
 
+// AI Interpretation functions
+function setupAIControls() {
+  const literalBtn = document.getElementById('ai-literal-btn');
+  const meaningBtn = document.getElementById('ai-meaning-btn');
+  const aiModal = document.getElementById('ai-modal');
+  const closeAiModal = document.getElementById('close-ai-modal');
+  const apiKeyModal = document.getElementById('api-key-modal');
+  const closeApiModal = document.getElementById('close-api-modal');
+  const saveApiKeyBtn = document.getElementById('save-api-key');
+
+  literalBtn.addEventListener('click', () => requestInterpretation('literal'));
+  meaningBtn.addEventListener('click', () => requestInterpretation('meaning'));
+
+  closeAiModal.addEventListener('click', () => aiModal.classList.add('hidden'));
+  closeApiModal.addEventListener('click', () => apiKeyModal.classList.add('hidden'));
+
+  saveApiKeyBtn.addEventListener('click', () => {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (key) {
+      localStorage.setItem(API_KEY_STORAGE, key);
+      apiKeyModal.classList.add('hidden');
+      // Retry the last request
+      if (window.pendingAIRequest) {
+        requestInterpretation(window.pendingAIRequest);
+      }
+    }
+  });
+
+  // Close modals on backdrop click
+  aiModal.addEventListener('click', (e) => {
+    if (e.target === aiModal) aiModal.classList.add('hidden');
+  });
+  apiKeyModal.addEventListener('click', (e) => {
+    if (e.target === apiKeyModal) apiKeyModal.classList.add('hidden');
+  });
+}
+
+async function requestInterpretation(type) {
+  const apiKey = localStorage.getItem(API_KEY_STORAGE);
+  if (!apiKey) {
+    window.pendingAIRequest = type;
+    document.getElementById('api-key-modal').classList.remove('hidden');
+    return;
+  }
+
+  const painting = getCurrentPainting();
+  if (!painting) return;
+
+  const aiModal = document.getElementById('ai-modal');
+  const aiTitle = document.getElementById('ai-modal-title');
+  const aiLoading = document.getElementById('ai-loading');
+  const aiText = document.getElementById('ai-text');
+
+  // Set title based on type
+  aiTitle.textContent = type === 'literal' ? 'What\'s in this painting' : 'Deeper meaning';
+
+  // Show modal with loading state
+  aiModal.classList.remove('hidden');
+  aiLoading.textContent = 'Thinking...';
+  aiText.textContent = '';
+
+  // Disable buttons while loading
+  document.getElementById('ai-literal-btn').disabled = true;
+  document.getElementById('ai-meaning-btn').disabled = true;
+
+  try {
+    const prompt = type === 'literal' ? LITERAL_PROMPT : MEANING_PROMPT;
+    const imageUrl = cleanImageUrl(painting.image);
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'url',
+                url: imageUrl
+              }
+            },
+            {
+              type: 'text',
+              text: `This is "${painting.title}" by ${painting.artistName}${painting.completitionYear ? ` (${painting.completitionYear})` : ''}.\n\n${prompt}`
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'API request failed');
+    }
+
+    const data = await response.json();
+    aiLoading.textContent = '';
+    aiText.textContent = data.content[0].text;
+
+  } catch (error) {
+    console.error('AI request failed:', error);
+    aiLoading.textContent = '';
+
+    if (error.message.includes('invalid x-api-key') || error.message.includes('401')) {
+      aiText.textContent = 'Invalid API key. Please check your key and try again.';
+      localStorage.removeItem(API_KEY_STORAGE);
+    } else if (error.message.includes('CORS') || error.name === 'TypeError') {
+      aiText.textContent = 'Unable to connect to Claude API. This may be a browser restriction.\n\nTry using the app in a different browser or contact support.';
+    } else {
+      aiText.textContent = `Error: ${error.message}`;
+    }
+  } finally {
+    document.getElementById('ai-literal-btn').disabled = false;
+    document.getElementById('ai-meaning-btn').disabled = false;
+  }
+}
+
 // Start
+setupAIControls();
 init();

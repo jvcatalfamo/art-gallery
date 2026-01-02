@@ -175,6 +175,70 @@ html, body {
   background: rgba(255, 100, 100, 1);
 }
 
+/* AI buttons */
+#ai-buttons {
+  position: absolute;
+  bottom: 80px;
+  left: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.ai-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.ai-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.ai-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* AI Modal */
+.ai-modal-content {
+  max-height: 70vh;
+}
+
+#ai-response {
+  max-height: 50vh;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+#ai-loading {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+}
+
+#ai-text {
+  font-size: 15px;
+  color: #ddd;
+  white-space: pre-wrap;
+}
+
+#ai-text:empty {
+  display: none;
+}
+
+#ai-loading:empty {
+  display: none;
+}
+
 /* Save panel */
 #save-panel {
   position: absolute;
