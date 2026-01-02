@@ -1018,6 +1018,27 @@ function setupAIControls() {
   });
 }
 
+// Convert image URL to base64
+async function imageToBase64(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      // Get base64 without the data:image/jpeg;base64, prefix
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const base64 = dataUrl.split(',')[1];
+      resolve(base64);
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = url;
+  });
+}
+
 async function requestInterpretation(type) {
   const apiKey = localStorage.getItem(API_KEY_STORAGE);
   if (!apiKey) {
@@ -1050,6 +1071,11 @@ async function requestInterpretation(type) {
     const prompt = type === 'literal' ? LITERAL_PROMPT : MEANING_PROMPT;
     const imageUrl = cleanImageUrl(painting.image);
 
+    // Convert image to base64 (WikiArt URLs can't be fetched directly by Claude)
+    aiLoading.textContent = 'Loading image...';
+    const imageBase64 = await imageToBase64(imageUrl);
+    aiLoading.textContent = 'Thinking...';
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1067,8 +1093,9 @@ async function requestInterpretation(type) {
             {
               type: 'image',
               source: {
-                type: 'url',
-                url: imageUrl
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: imageBase64
               }
             },
             {
