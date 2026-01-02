@@ -159,22 +159,31 @@ function setupZoom(img, containerId) {
     if (e.touches.length === 2) {
       e.preventDefault();
       initialDistance = getDistance(e.touches[0], e.touches[1]);
-      initialScale = zoomScale;
+      initialScale = zoomScale || 1;
+      zoomedImg = img; // Enable zoom mode on pinch start
     }
   }, { passive: false });
 
   img.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2 && zoomedImg === img) {
+    if (e.touches.length === 2) {
       e.preventDefault();
       const distance = getDistance(e.touches[0], e.touches[1]);
       const newScale = Math.min(5, Math.max(1, initialScale * (distance / initialDistance)));
       zoomScale = newScale;
+      zoomedImg = img;
       applyZoom(img);
     } else if (e.touches.length === 1 && zoomedImg === img && zoomScale > 1) {
       // Pan when zoomed
       e.preventDefault();
     }
   }, { passive: false });
+
+  img.addEventListener('touchend', (e) => {
+    // Reset zoom if scale is back to 1
+    if (zoomScale <= 1.05) {
+      resetZoom();
+    }
+  });
 }
 
 function getDistance(t1, t2) {
@@ -360,7 +369,30 @@ function setupControls() {
   setupZoom(artworkImg, 'artwork-container');
   setupZoom(document.getElementById('album-artwork'), 'album-artwork-container');
 
-  artworkImg.addEventListener('click', next);
+  // Tap left = prev, tap right = next (standard gallery behavior)
+  artworkImg.addEventListener('click', (e) => {
+    const rect = artworkImg.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const threshold = rect.width * 0.3; // Left 30% = prev
+    if (x < threshold) {
+      prev();
+    } else {
+      next();
+    }
+  });
+
+  // Same for album view
+  document.getElementById('album-artwork').addEventListener('click', (e) => {
+    const img = e.target;
+    const rect = img.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const threshold = rect.width * 0.3;
+    if (x < threshold) {
+      prevInAlbum();
+    } else {
+      nextInAlbum();
+    }
+  });
 
   // Navigation buttons
   statsBtn.addEventListener('click', showStats);
@@ -426,9 +458,6 @@ function setupControls() {
 
   // Remove from album
   document.getElementById('remove-from-album-btn').addEventListener('click', removeFromCurrentAlbum);
-
-  // Album artwork click
-  document.getElementById('album-artwork').addEventListener('click', nextInAlbum);
 }
 
 // Album checkboxes in save panel
