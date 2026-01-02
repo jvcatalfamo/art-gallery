@@ -97,7 +97,7 @@ async function loadPaintings() {
     paintings = await response.json();
     paintingsMap = {};
     for (const p of paintings) {
-      paintingsMap[p.contentId] = p;
+      paintingsMap[getPaintingId(p)] = p;
     }
     console.log(`Loaded ${paintings.length} paintings`);
   } catch (e) {
@@ -108,8 +108,8 @@ async function loadPaintings() {
 
 // Sorting functions
 function applySort() {
-  const unseenPaintings = paintings.filter(p => !seen.has(Number(p.contentId)));
-  const seenPaintings = paintings.filter(p => seen.has(Number(p.contentId)));
+  const unseenPaintings = paintings.filter(p => !seen.has(getPaintingId(p)));
+  const seenPaintings = paintings.filter(p => seen.has(getPaintingId(p)));
 
   switch (settings.sortOrder) {
     case 'random':
@@ -143,6 +143,11 @@ function shuffle(arr) {
 function cleanImageUrl(url) {
   if (!url) return '';
   return url.replace(/![\w]+\.(jpg|jpeg|png|gif)$/i, '');
+}
+
+// Get unique ID for a painting (image URL is more unique than contentId)
+function getPaintingId(painting) {
+  return painting.image || painting.contentId;
 }
 
 // Zoom functionality
@@ -312,14 +317,14 @@ function setupTouchNav(img, prevFn, nextFn) {
 function showCurrentArtwork() {
   if (paintings.length === 0) return;
 
-  const unseenCount = paintings.filter(p => !seen.has(Number(p.contentId))).length;
+  const unseenCount = paintings.filter(p => !seen.has(getPaintingId(p))).length;
   if (unseenCount === 0 && settings.sortOrder === 'unseen') {
     showCompleteMessage();
     return;
   }
 
   if (settings.sortOrder === 'unseen') {
-    while (currentIndex < orderedList.length && seen.has(Number(orderedList[currentIndex].contentId))) {
+    while (currentIndex < orderedList.length && seen.has(getPaintingId(orderedList[currentIndex]))) {
       currentIndex++;
     }
     if (currentIndex >= orderedList.length) {
@@ -332,7 +337,7 @@ function showCurrentArtwork() {
   const painting = orderedList[currentIndex];
   if (!painting) return;
 
-  seen.add(Number(painting.contentId));
+  seen.add(getPaintingId(painting));
   saveSeen();
 
   loadingEl.textContent = 'Loading...';
@@ -513,7 +518,7 @@ function renderAlbumCheckboxes() {
   if (!painting) return;
 
   albumCheckboxes.innerHTML = albums.map(album => {
-    const isIn = album.artworks.includes(painting.contentId);
+    const isIn = album.artworks.includes(getPaintingId(painting));
     return `
       <label>
         <input type="checkbox" data-album-id="${album.id}" ${isIn ? 'checked' : ''}>
@@ -529,11 +534,11 @@ function renderAlbumCheckboxes() {
       if (!album) return;
 
       if (e.target.checked) {
-        if (!album.artworks.includes(painting.contentId)) {
-          album.artworks.push(painting.contentId);
+        if (!album.artworks.includes(getPaintingId(painting))) {
+          album.artworks.push(getPaintingId(painting));
         }
       } else {
-        album.artworks = album.artworks.filter(id => id !== painting.contentId);
+        album.artworks = album.artworks.filter(id => id !== getPaintingId(painting));
       }
       saveAlbums();
     });
@@ -744,7 +749,7 @@ function renderStats() {
     const artist = painting.artistName || 'Unknown';
     if (!artistStats[artist]) artistStats[artist] = { total: 0, seen: 0 };
     artistStats[artist].total++;
-    if (seen.has(Number(painting.contentId))) artistStats[artist].seen++;
+    if (seen.has(getPaintingId(painting))) artistStats[artist].seen++;
   }
 
   // Filter to only artists with seen > 0, sort by seen count descending
@@ -775,9 +780,8 @@ function loadSeen() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
-      // Ensure all IDs are numbers for consistent comparison
-      const ids = JSON.parse(data).map(id => Number(id));
-      seen = new Set(ids);
+      // IDs are now image URLs (strings), but keep old number IDs for backwards compat
+      seen = new Set(JSON.parse(data));
       console.log(`Loaded ${seen.size} seen artworks`);
     }
   } catch (e) {
