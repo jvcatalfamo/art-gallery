@@ -261,6 +261,7 @@ function showCurrentArtwork() {
     artworkImg.src = imageUrl;
     artworkImg.classList.add('loaded');
     loadingEl.classList.add('hidden');
+    preloadNext();
   };
   img.onerror = () => {
     console.warn('Failed to load:', imageUrl);
@@ -272,6 +273,19 @@ function showCurrentArtwork() {
   artistEl.textContent = painting.artistName || 'Unknown';
   yearEl.textContent = painting.year || '';
   styleEl.textContent = painting.style || '';
+}
+
+// Preload next few images for faster navigation
+function preloadNext() {
+  const preloadCount = 3; // Preload next 3 images
+  for (let i = 1; i <= preloadCount; i++) {
+    const nextIdx = (currentIndex + i) % orderedList.length;
+    const painting = orderedList[nextIdx];
+    if (painting && painting.image) {
+      const img = new Image();
+      img.src = cleanImageUrl(painting.image);
+    }
+  }
 }
 
 function showCompleteMessage() {
