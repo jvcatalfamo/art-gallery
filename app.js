@@ -8,23 +8,24 @@ const DATA_FILE = './data/paintings.json';
 const BACKUP_REMINDER_THRESHOLD = 50; // Remind after 50 new artworks
 const API_KEY_STORAGE = 'artgallery_apikey';
 
-// AI prompts
-const LITERAL_PROMPT = `Describe what is literally depicted in this painting. Be specific about:
-- The scene, setting, and composition
-- People/figures (who they might be, what they're doing, their expressions)
-- Objects, animals, or symbolic elements
-- Colors, lighting, and atmosphere
+// AI prompts - title/artist will be prepended
+const LITERAL_PROMPT = `Using the title and artist info provided, describe what is literally depicted:
 
-Keep it concise (2-3 short paragraphs). Focus on what you can SEE, not interpretations.`;
+- Who are the specific people/figures? (Use the title to identify them)
+- What scene or event is shown?
+- Key objects, setting, and composition
+- Colors, lighting, atmosphere
 
-const MEANING_PROMPT = `Provide insight into the deeper meaning and context of this painting:
-- What might the artist be expressing or exploring?
-- Historical/cultural context if relevant
-- Symbolism and hidden meanings
-- How this relates to the artist's life, style, or the art movement
-- Emotional resonance or themes
+Be specific and use the title context. Keep it concise (2-3 paragraphs).`;
 
-Keep it thoughtful but concise (2-3 paragraphs). Make it interesting and illuminating.`;
+const MEANING_PROMPT = `Using the title and artist info provided, explain the deeper meaning:
+
+- Historical context - what event/period is this? Why did the artist paint it?
+- Who commissioned it and why? What was the artist's relationship to the subject?
+- Symbolism and what the artist was trying to convey
+- How this fits in the artist's body of work or the art movement
+
+Be insightful and use the title/artist context. Keep it concise (2-3 paragraphs).`;
 
 let paintings = [];
 let paintingsMap = {};
@@ -1100,7 +1101,12 @@ async function requestInterpretation(type) {
             },
             {
               type: 'text',
-              text: `This is "${painting.title}" by ${painting.artistName}${painting.completitionYear ? ` (${painting.completitionYear})` : ''}.\n\n${prompt}`
+              text: `PAINTING INFO:
+Title: "${painting.title}"
+Artist: ${painting.artistName}
+${painting.completitionYear ? `Year: ${painting.completitionYear}` : ''}
+
+${prompt}`
             }
           ]
         }]
