@@ -46,7 +46,6 @@ const completeMsgEl = document.getElementById('complete-msg');
 const titleEl = document.getElementById('title');
 const artistEl = document.getElementById('artist');
 const yearEl = document.getElementById('year');
-const styleEl = document.getElementById('style');
 const statsBtn = document.getElementById('stats-btn');
 const backBtn = document.getElementById('back-btn');
 const settingsBtn = document.getElementById('settings-btn');
@@ -271,8 +270,7 @@ function showCurrentArtwork() {
 
   titleEl.textContent = painting.title || 'Untitled';
   artistEl.textContent = painting.artistName || 'Unknown';
-  yearEl.textContent = painting.year || '';
-  styleEl.textContent = painting.style || '';
+  yearEl.textContent = painting.completitionYear || painting.yearAsString || '';
 }
 
 // Preload next few images for faster navigation
@@ -607,7 +605,7 @@ function renderAlbumDetail() {
 
   document.getElementById('album-art-title').textContent = painting.title || 'Untitled';
   document.getElementById('album-art-artist').textContent = painting.artistName || 'Unknown';
-  document.getElementById('album-art-year').textContent = painting.year || '';
+  document.getElementById('album-art-year').textContent = painting.completitionYear || painting.yearAsString || '';
   document.getElementById('album-detail-count').textContent =
     `${currentAlbumIndex + 1} / ${album.artworks.length}`;
 }
@@ -704,32 +702,6 @@ function renderStats() {
   document.getElementById('overall-fill').style.width = `${percent}%`;
   document.getElementById('overall-text').textContent =
     `${seenCount.toLocaleString()} / ${total.toLocaleString()} artworks seen (${percent}%)`;
-
-  // By style
-  const styleStats = {};
-  for (const painting of paintings) {
-    const style = painting.style || 'Unknown';
-    if (!styleStats[style]) styleStats[style] = { total: 0, seen: 0 };
-    styleStats[style].total++;
-    if (seen.has(painting.contentId)) styleStats[style].seen++;
-  }
-
-  document.getElementById('style-list').innerHTML = Object.entries(styleStats)
-    .sort((a, b) => b[1].total - a[1].total)
-    .map(([name, stats]) => {
-      const pct = (stats.seen / stats.total * 100).toFixed(0);
-      return `
-        <div class="artist-row">
-          <div class="artist-info">
-            <span class="artist-name">${name}</span>
-            <span class="artist-count">${stats.seen} / ${stats.total}</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: ${pct}%"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
 
   // By artist
   const artistStats = {};
