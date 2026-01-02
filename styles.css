@@ -1,0 +1,601 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #000;
+  color: #fff;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Views */
+.view {
+  display: none;
+  height: 100%;
+  width: 100%;
+}
+
+.view.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Gallery View */
+#gallery, #album-detail {
+  position: relative;
+}
+
+#artwork-container, #album-artwork-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111;
+}
+
+#artwork, #album-artwork {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+#artwork.loaded, #album-artwork.loaded {
+  opacity: 1;
+}
+
+#artwork, #album-artwork {
+  cursor: zoom-in;
+  transition: transform 0.2s ease, opacity 0.3s ease;
+}
+
+#artwork-container, #album-artwork-container {
+  overflow: hidden;
+}
+
+#loading, #album-loading {
+  position: absolute;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Info bar */
+#info, #album-info {
+  padding: 16px 20px;
+  background: #000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  min-height: 60px;
+}
+
+#title, #album-art-title {
+  font-weight: 500;
+  font-size: 16px;
+  color: #fff;
+}
+
+#artist, #album-art-artist {
+  font-size: 14px;
+  color: #aaa;
+}
+
+#year, #album-art-year {
+  font-size: 14px;
+  color: #666;
+}
+
+/* Style tag in info */
+#style {
+  font-size: 12px;
+  color: #666;
+  background: #222;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+#style:empty {
+  display: none;
+}
+
+/* Icon buttons */
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.icon-btn.small {
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+}
+
+/* Button positions */
+#stats-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+#settings-btn {
+  position: absolute;
+  top: 16px;
+  right: 70px;
+}
+
+#albums-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+}
+
+.save-btn {
+  position: absolute;
+  bottom: 80px;
+  right: 16px;
+  background: rgba(74, 158, 255, 0.8);
+}
+
+.save-btn:hover {
+  background: rgba(74, 158, 255, 1);
+}
+
+.remove-btn {
+  position: absolute;
+  bottom: 80px;
+  right: 16px;
+  background: rgba(255, 100, 100, 0.8);
+}
+
+.remove-btn:hover {
+  background: rgba(255, 100, 100, 1);
+}
+
+/* Save panel */
+#save-panel {
+  position: absolute;
+  bottom: 140px;
+  right: 16px;
+  background: #222;
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 20;
+  min-width: 200px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panel-header h3 {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#album-checkboxes label {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #333;
+}
+
+#album-checkboxes label:last-child {
+  border-bottom: none;
+}
+
+#album-checkboxes input[type="checkbox"] {
+  margin-right: 12px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Settings panel */
+#settings-panel {
+  position: absolute;
+  top: 70px;
+  right: 16px;
+  background: #222;
+  border-radius: 8px;
+  padding: 16px;
+  z-index: 10;
+  min-width: 200px;
+}
+
+#settings-panel h3 {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+#settings-panel label {
+  display: block;
+  padding: 8px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#settings-panel input[type="radio"] {
+  margin-right: 8px;
+}
+
+/* Complete/empty messages */
+#complete-msg, #album-empty {
+  position: absolute;
+  text-align: center;
+  color: #888;
+}
+
+#complete-msg p, #album-empty p {
+  margin-bottom: 16px;
+  font-size: 18px;
+}
+
+#reset-btn {
+  background: #4a9eff;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#reset-btn:hover {
+  background: #3a8eef;
+}
+
+/* Albums View */
+#albums {
+  background: #111;
+}
+
+#albums-header, #album-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #333;
+}
+
+#albums-header h1, #album-detail-header h1 {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+#album-detail-count {
+  font-size: 14px;
+  color: #666;
+}
+
+#albums-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.album-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.album-item:hover {
+  background: #222;
+}
+
+.album-item .album-icon {
+  width: 48px;
+  height: 48px;
+  background: #333;
+  border-radius: 8px;
+  margin-right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.album-item .album-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-item .album-info {
+  flex: 1;
+}
+
+.album-item .album-name {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.album-item .album-count {
+  font-size: 12px;
+  color: #888;
+}
+
+/* Album Detail View */
+#album-detail {
+  background: #000;
+}
+
+/* Edit Albums Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background: #222;
+  border-radius: 12px;
+  padding: 20px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+#edit-albums-list {
+  margin-bottom: 16px;
+}
+
+.edit-album-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #333;
+}
+
+.edit-album-row input[type="text"] {
+  flex: 1;
+  background: #333;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.edit-album-row input[type="text"]:focus {
+  outline: 2px solid #4a9eff;
+}
+
+.delete-album-btn {
+  background: transparent;
+  border: none;
+  color: #ff6666;
+  cursor: pointer;
+  padding: 8px;
+  font-size: 18px;
+}
+
+.text-btn {
+  background: transparent;
+  border: 1px solid #4a9eff;
+  color: #4a9eff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.text-btn:hover {
+  background: rgba(74, 158, 255, 0.1);
+}
+
+/* Backup section */
+.backup-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.action-btn {
+  flex: 1;
+  background: #4a9eff;
+  color: #fff;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background: #3a8eef;
+}
+
+.action-btn.secondary {
+  background: #333;
+}
+
+.action-btn.secondary:hover {
+  background: #444;
+}
+
+#last-backup-text {
+  font-size: 13px;
+  color: #888;
+}
+
+#backup-reminder .modal-content p {
+  color: #aaa;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+#backup-reminder #reminder-count {
+  color: #4a9eff;
+  font-weight: 600;
+}
+
+/* Stats View */
+#stats {
+  background: #111;
+  flex-direction: column;
+}
+
+#stats-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #333;
+}
+
+#stats-header h1 {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+#stats-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.stat-section {
+  margin-bottom: 32px;
+}
+
+.stat-section h2 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* Progress bars */
+.progress-bar {
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4a9eff;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+#overall-text {
+  font-size: 14px;
+  color: #aaa;
+}
+
+/* Style/Artist lists */
+#style-list, #artist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.artist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.artist-row .artist-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.artist-row .artist-name {
+  font-size: 14px;
+  color: #fff;
+}
+
+.artist-row .artist-count {
+  font-size: 12px;
+  color: #666;
+}
+
+.artist-row .progress-bar {
+  height: 6px;
+}
+
+/* Touch feedback */
+#gallery, #album-detail {
+  touch-action: pan-x;
+  user-select: none;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  #info, #album-info {
+    padding: 12px 16px;
+  }
+
+  #title, #album-art-title {
+    font-size: 14px;
+  }
+
+  #artist, #year, #album-art-artist, #album-art-year {
+    font-size: 12px;
+  }
+}

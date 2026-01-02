@@ -1,0 +1,175 @@
+[
+  {
+    "contentId": 225091,
+    "artistName": "Leonardo da Vinci",
+    "url": "leonardo-da-vinci",
+    "lastNameFirst": "da Vinci Leonardo",
+    "birthDay": "/Date(-16337462400000)/",
+    "deathDay": "/Date(-14221785600000)/",
+    "birthDayAsString": "April 15, 1452",
+    "deathDayAsString": "May 2, 1519",
+    "image": "https://uploads5.wikiart.org/00540/images/leonardo-da-vinci/leo5.png!Portrait.png",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Leonardo_da_Vinci",
+    "dictonaries": [
+      303,
+      925
+    ]
+  },
+  {
+    "contentId": 220740,
+    "artistName": "Salvador Dali",
+    "url": "salvador-dali",
+    "lastNameFirst": "Dali Salvador",
+    "birthDay": "/Date(-2071526400000)/",
+    "deathDay": "/Date(601516800000)/",
+    "birthDayAsString": "May 11, 1904",
+    "deathDayAsString": "January 23, 1989",
+    "image": "https://uploads5.wikiart.org/images/salvador-dali.jpg!Portrait.jpg",
+    "wikipediaUrl": "https://en.wikipedia.org/wiki/Salvador_Dal%C3%AD",
+    "dictonaries": [
+      0,
+      2165,
+      336
+    ]
+  },
+  {
+    "contentId": 191443,
+    "artistName": "Gustav Klimt",
+    "url": "gustav-klimt",
+    "lastNameFirst": "Klimt Gustav",
+    "birthDay": "/Date(-3391372800000)/",
+    "deathDay": "/Date(-1637884800000)/",
+    "birthDayAsString": "July 14, 1862",
+    "deathDayAsString": "February 6, 1918",
+    "image": "https://uploads4.wikiart.org/images/gustav-klimt.jpg!Portrait.jpg",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Gustav_Klimt",
+    "dictonaries": [
+      318,
+      2274,
+      315,
+      2275
+    ]
+  },
+  {
+    "contentId": 193104,
+    "artistName": "Michelangelo",
+    "url": "michelangelo",
+    "lastNameFirst": "Michelangelo",
+    "birthDay": "/Date(-15615158400000)/",
+    "deathDay": "/Date(-12808022400000)/",
+    "birthDayAsString": "March 6, 1475",
+    "deathDayAsString": "February 18, 1564",
+    "image": "https://uploads8.wikiart.org/00540/images/michelangelo/michelangelo.png!Portrait.png",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Michelangelo",
+    "dictonaries": [
+      2451,
+      303,
+      925
+    ]
+  },
+  {
+    "contentId": 211667,
+    "artistName": "Claude Monet",
+    "url": "claude-monet",
+    "lastNameFirst": "Monet Claude",
+    "birthDay": "/Date(-4074969600000)/",
+    "deathDay": "/Date(-1359331200000)/",
+    "birthDayAsString": "November 14, 1840",
+    "deathDayAsString": "December 5, 1926",
+    "image": "https://uploads0.wikiart.org/00115/images/claude-monet/440px-claude-monet-1899-nadar-crop.jpg!Portrait.jpg",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Claude_Monet",
+    "dictonaries": [
+      1221,
+      316
+    ]
+  },
+  {
+    "contentId": 185320,
+    "artistName": "Edvard Munch",
+    "url": "edvard-munch",
+    "lastNameFirst": "Munch Edvard ",
+    "birthDay": "/Date(-3346790400000)/",
+    "deathDay": "/Date(-820540800000)/",
+    "birthDayAsString": "December 12, 1863",
+    "deathDayAsString": "1944",
+    "image": "https://uploads7.wikiart.org/images/edvard-munch/self-portrait-i-1896.jpg!Portrait.jpg",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Edvard_Munch",
+    "dictonaries": [
+      321,
+      2776,
+      315
+    ]
+  },
+  {
+    "contentId": 223667,
+    "artistName": "Pablo Picasso",
+    "url": "pablo-picasso",
+    "lastNameFirst": "Picasso Pablo",
+    "birthDay": "/Date(-2782857600000)/",
+    "deathDay": "/Date(103075200000)/",
+    "birthDayAsString": "October 25, 1881",
+    "deathDayAsString": "April 8, 1973",
+    "image": "https://uploads4.wikiart.org/00115/images/pablo-picasso/iuyqtex0.jpeg!Portrait.jpeg",
+    "wikipediaUrl": "https://en.wikipedia.org/wiki/Pablo_Picasso",
+    "dictonaries": [
+      322,
+      876,
+      317,
+      2165,
+      336
+    ]
+  },
+  {
+    "contentId": 219933,
+    "artistName": "Rembrandt",
+    "url": "rembrandt",
+    "lastNameFirst": "Rembrandt",
+    "birthDay": "/Date(-11469859200000)/",
+    "deathDay": "/Date(-9474710400000)/",
+    "birthDayAsString": "July 15, 1606",
+    "deathDayAsString": "October 4, 1669",
+    "image": "https://uploads1.wikiart.org/images/rembrandt.jpg!Portrait.jpg",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Rembrandt",
+    "dictonaries": [
+      307,
+      16743,
+      0,
+      6925
+    ]
+  },
+  {
+    "contentId": 204915,
+    "artistName": "Vincent van Gogh",
+    "url": "vincent-van-gogh",
+    "lastNameFirst": "van Gogh Vincent ",
+    "birthDay": "/Date(-3684528000000)/",
+    "deathDay": "/Date(-2506464000000)/",
+    "birthDayAsString": "March 30, 1853",
+    "deathDayAsString": "July 29, 1890",
+    "image": "https://uploads1.wikiart.org/00540/images/vincent-van-gogh/van-gogh-4.png!Portrait.png",
+    "wikipediaUrl": "https://en.wikipedia.org/wiki/Vincent_van_Gogh",
+    "dictonaries": [
+      16743,
+      317
+    ]
+  },
+  {
+    "contentId": 230728,
+    "artistName": "Johannes Vermeer",
+    "url": "johannes-vermeer",
+    "lastNameFirst": "Vermeer Johannes",
+    "birthDay": "/Date(-10639987200000)/",
+    "deathDay": "/Date(-9279187200000)/",
+    "birthDayAsString": "October 31, 1632",
+    "deathDayAsString": "December 15, 1675",
+    "image": "https://uploads8.wikiart.org/images/johannes-vermeer.jpg!Portrait.jpg",
+    "wikipediaUrl": "http://en.wikipedia.org/wiki/Johannes_Vermeer",
+    "dictonaries": [
+      307,
+      13993,
+      16743,
+      0,
+      6925
+    ]
+  }
+]

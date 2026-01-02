@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Art Gallery</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Main Gallery View -->
+  <div id="gallery" class="view active">
+    <div id="artwork-container">
+      <img id="artwork" src="" alt="">
+      <div id="loading">Loading...</div>
+      <div id="complete-msg" class="hidden">
+        <p>You've seen all artworks!</p>
+        <button id="reset-btn">Start Over</button>
+      </div>
+    </div>
+    <div id="info">
+      <span id="title"></span>
+      <span id="artist"></span>
+      <span id="year"></span>
+      <span id="style"></span>
+    </div>
+    <!-- Top buttons -->
+    <button id="albums-btn" class="icon-btn" title="My Albums">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h8v2H6zm10 0h2v2h-2zm-6-4h8v2h-8z"/>
+      </svg>
+    </button>
+    <button id="stats-btn" class="icon-btn" title="View Progress">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+      </svg>
+    </button>
+    <button id="settings-btn" class="icon-btn" title="Settings">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
+      </svg>
+    </button>
+    <!-- Save button (bottom right) -->
+    <button id="save-btn" class="icon-btn save-btn" title="Save to Album">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Save to Album Panel -->
+  <div id="save-panel" class="hidden">
+    <div class="panel-header">
+      <h3>Save to Album</h3>
+      <button id="close-save-panel" class="icon-btn small">×</button>
+    </div>
+    <div id="album-checkboxes"></div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div id="settings-panel" class="hidden">
+    <h3>Sort Order</h3>
+    <label><input type="radio" name="sort" value="random"> Random</label>
+    <label><input type="radio" name="sort" value="chronological"> Chronological</label>
+    <label><input type="radio" name="sort" value="artist"> By Artist</label>
+    <label><input type="radio" name="sort" value="unseen" checked> Unseen First</label>
+  </div>
+
+  <!-- Albums View -->
+  <div id="albums" class="view">
+    <div id="albums-header">
+      <button id="albums-back-btn" class="icon-btn" title="Back">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+        </svg>
+      </button>
+      <h1>My Albums</h1>
+      <button id="edit-albums-btn" class="icon-btn" title="Edit Albums">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+      </button>
+    </div>
+    <div id="albums-list"></div>
+  </div>
+
+  <!-- Album Detail View -->
+  <div id="album-detail" class="view">
+    <div id="album-detail-header">
+      <button id="album-detail-back-btn" class="icon-btn" title="Back">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+        </svg>
+      </button>
+      <h1 id="album-detail-title">Album</h1>
+      <span id="album-detail-count"></span>
+    </div>
+    <div id="album-artwork-container">
+      <img id="album-artwork" src="" alt="">
+      <div id="album-loading">Loading...</div>
+      <div id="album-empty" class="hidden">
+        <p>No artworks in this album yet</p>
+      </div>
+    </div>
+    <div id="album-info">
+      <span id="album-art-title"></span>
+      <span id="album-art-artist"></span>
+      <span id="album-art-year"></span>
+    </div>
+    <button id="remove-from-album-btn" class="icon-btn remove-btn" title="Remove from Album">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M19 13H5v-2h14v2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Edit Albums Modal -->
+  <div id="edit-albums-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit Albums</h2>
+        <button id="close-edit-modal" class="icon-btn small">×</button>
+      </div>
+      <div id="edit-albums-list"></div>
+      <button id="add-album-btn" class="text-btn">+ Add Album</button>
+    </div>
+  </div>
+
+  <!-- Stats View -->
+  <div id="stats" class="view">
+    <div id="stats-header">
+      <button id="back-btn" class="icon-btn" title="Back to Gallery">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+        </svg>
+      </button>
+      <h1>Progress</h1>
+    </div>
+    <div id="stats-content">
+      <div id="overall-stats" class="stat-section">
+        <h2>Overall</h2>
+        <div class="progress-bar">
+          <div class="progress-fill" id="overall-fill"></div>
+        </div>
+        <p id="overall-text">0 / 0 artworks seen</p>
+      </div>
+      <div id="style-stats" class="stat-section">
+        <h2>By Style / Movement</h2>
+        <div id="style-list"></div>
+      </div>
+      <div id="artist-stats" class="stat-section">
+        <h2>By Artist</h2>
+        <div id="artist-list"></div>
+      </div>
+      <div id="backup-section" class="stat-section">
+        <h2>Backup & Restore</h2>
+        <p id="last-backup-text">No backup yet</p>
+        <div class="backup-buttons">
+          <button id="export-btn" class="action-btn">Export Data</button>
+          <button id="import-btn" class="action-btn secondary">Import Data</button>
+        </div>
+        <input type="file" id="import-file" accept=".json" style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup Reminder Modal -->
+  <div id="backup-reminder" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Time to Backup!</h2>
+        <button id="close-backup-reminder" class="icon-btn small">×</button>
+      </div>
+      <p>You've seen <span id="reminder-count">0</span> new artworks since your last backup. Export your data to keep it safe!</p>
+      <div class="backup-buttons">
+        <button id="reminder-export-btn" class="action-btn">Export Now</button>
+        <button id="reminder-later-btn" class="action-btn secondary">Remind Me Later</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
