@@ -4,7 +4,7 @@ const STORAGE_KEY = 'artgallery_seen';
 const SETTINGS_KEY = 'artgallery_settings';
 const ALBUMS_KEY = 'artgallery_albums';
 const BACKUP_KEY = 'artgallery_backup_info';
-const DATA_FILE = './data/paintings-sample.json';
+const DATA_FILE = './data/paintings.json';
 const BACKUP_REMINDER_THRESHOLD = 50; // Remind after 50 new artworks
 
 let paintings = [];
