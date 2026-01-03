@@ -1063,9 +1063,9 @@ async function requestInterpretation(type) {
   // Set title based on type
   aiTitle.textContent = type === 'literal' ? 'What\'s in this painting' : 'Deeper meaning';
 
-  // Show modal with loading state
+  // Show modal with breathing orb
   aiModal.classList.remove('hidden');
-  aiLoading.textContent = 'Thinking...';
+  aiLoading.innerHTML = '<div class="breathing-orb"></div>';
   aiText.textContent = '';
 
   // Disable buttons while loading
@@ -1077,9 +1077,7 @@ async function requestInterpretation(type) {
     const imageUrl = cleanImageUrl(painting.image);
 
     // Convert image to base64 (WikiArt URLs can't be fetched directly by Claude)
-    aiLoading.textContent = 'Loading image...';
     const imageBase64 = await imageToBase64(imageUrl);
-    aiLoading.textContent = 'Thinking...';
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1123,12 +1121,12 @@ ${prompt}`
     }
 
     const data = await response.json();
-    aiLoading.textContent = '';
+    aiLoading.innerHTML = '';
     aiText.textContent = data.content[0].text;
 
   } catch (error) {
     console.error('AI request failed:', error);
-    aiLoading.textContent = '';
+    aiLoading.innerHTML = '';
 
     if (error.message.includes('invalid x-api-key') || error.message.includes('401')) {
       aiText.textContent = 'Invalid API key. Please check your key and try again.';
