@@ -1063,10 +1063,22 @@ async function requestInterpretation(type) {
   // Set title based on type
   aiTitle.textContent = type === 'literal' ? 'What\'s in this painting' : 'Deeper meaning';
 
-  // Show modal with breathing orb
+  // Show modal with breathing orb and cycling text
   aiModal.classList.remove('hidden');
-  aiLoading.innerHTML = '<div class="breathing-orb"></div>';
+  aiLoading.innerHTML = '<div class="breathing-orb"></div><div class="breath-text">breathe in</div>';
   aiText.textContent = '';
+
+  // Cycle through calming messages
+  const breathMessages = ['breathe in', 'breathe out', 'relax', 'enjoy your day'];
+  let msgIndex = 0;
+  const breathInterval = setInterval(() => {
+    msgIndex = (msgIndex + 1) % breathMessages.length;
+    const textEl = aiLoading.querySelector('.breath-text');
+    if (textEl) textEl.textContent = breathMessages[msgIndex];
+  }, 3000);
+
+  // Store interval to clear later
+  window.breathInterval = breathInterval;
 
   // Disable buttons while loading
   document.getElementById('ai-literal-btn').disabled = true;
@@ -1121,11 +1133,13 @@ ${prompt}`
     }
 
     const data = await response.json();
+    if (window.breathInterval) clearInterval(window.breathInterval);
     aiLoading.innerHTML = '';
     aiText.textContent = data.content[0].text;
 
   } catch (error) {
     console.error('AI request failed:', error);
+    if (window.breathInterval) clearInterval(window.breathInterval);
     aiLoading.innerHTML = '';
 
     if (error.message.includes('invalid x-api-key') || error.message.includes('401')) {
