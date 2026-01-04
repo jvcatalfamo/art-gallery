@@ -145,9 +145,21 @@ function cleanImageUrl(url) {
   return url.replace(/![\w]+\.(jpg|jpeg|png|gif)$/i, '');
 }
 
-// Get unique ID for a painting (image URL is more unique than contentId)
+// Known placeholder images that are shared by many paintings
+const PLACEHOLDER_IMAGES = new Set([
+  'https://uploads.wikiart.org/Content/images/FRAME-600x480.jpg'
+]);
+
+// Get unique ID for a painting
+// For placeholder images, use contentId to differentiate
+// For unique images, use image URL (more reliable than contentId which has duplicates)
 function getPaintingId(painting) {
-  return painting.image || painting.contentId;
+  if (painting.image && !PLACEHOLDER_IMAGES.has(painting.image)) {
+    return painting.image;
+  }
+  // For placeholders or missing images, use contentId
+  // Add prefix to avoid collision with image URLs
+  return 'id:' + painting.contentId;
 }
 
 // Zoom functionality
@@ -510,6 +522,92 @@ function setupControls() {
 
   // Remove from album
   document.getElementById('remove-from-album-btn').addEventListener('click', removeFromCurrentAlbum);
+
+  // Note editing
+  document.getElementById('add-note-btn').addEventListener('click', openNoteModal);
+  document.getElementById('edit-note-btn').addEventListener('click', openNoteModal);
+  document.getElementById('close-note-modal').addEventListener('click', closeNoteModal);
+  document.getElementById('save-note-btn').addEventListener('click', saveNoteFromModal);
+  document.getElementById('delete-note-btn').addEventListener('click', deleteNoteFromModal);
+
+  // Close note modal on backdrop click
+  document.getElementById('edit-note-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'edit-note-modal') closeNoteModal();
+  });
+
+  // Note input in save panel - save on input with debounce
+  const noteInput = document.getElementById('note-input');
+  noteInput.addEventListener('input', debounce(() => {
+    const painting = getCurrentPainting();
+    if (!painting) return;
+
+    const paintingId = getPaintingId(painting);
+    const note = noteInput.value.trim();
+
+    // Save note to all albums that have this artwork
+    for (const album of albums) {
+      if (album.artworks.includes(paintingId)) {
+        if (!album.notes) album.notes = {};
+        if (note) {
+          album.notes[paintingId] = note;
+        } else {
+          delete album.notes[paintingId];
+        }
+      }
+    }
+    saveAlbums();
+  }, 500));
+}
+
+// Note modal functions
+function openNoteModal() {
+  const album = albums.find(a => a.id === currentAlbumId);
+  if (!album || album.artworks.length === 0) return;
+
+  const artworkId = album.artworks[currentAlbumIndex];
+  const currentNote = album.notes && album.notes[artworkId] || '';
+
+  document.getElementById('edit-note-input').value = currentNote;
+  document.getElementById('edit-note-modal').classList.remove('hidden');
+}
+
+function closeNoteModal() {
+  document.getElementById('edit-note-modal').classList.add('hidden');
+}
+
+function saveNoteFromModal() {
+  const album = albums.find(a => a.id === currentAlbumId);
+  if (!album || album.artworks.length === 0) return;
+
+  const artworkId = album.artworks[currentAlbumIndex];
+  const note = document.getElementById('edit-note-input').value.trim();
+
+  if (!album.notes) album.notes = {};
+
+  if (note) {
+    album.notes[artworkId] = note;
+  } else {
+    delete album.notes[artworkId];
+  }
+
+  saveAlbums();
+  closeNoteModal();
+  renderAlbumDetail();
+}
+
+function deleteNoteFromModal() {
+  const album = albums.find(a => a.id === currentAlbumId);
+  if (!album || album.artworks.length === 0) return;
+
+  const artworkId = album.artworks[currentAlbumIndex];
+
+  if (album.notes) {
+    delete album.notes[artworkId];
+  }
+
+  saveAlbums();
+  closeNoteModal();
+  renderAlbumDetail();
 }
 
 // Album checkboxes in save panel
@@ -517,8 +615,12 @@ function renderAlbumCheckboxes() {
   const painting = getCurrentPainting();
   if (!painting) return;
 
+  const paintingId = getPaintingId(painting);
+  const noteSection = document.getElementById('note-section');
+  const noteInput = document.getElementById('note-input');
+
   albumCheckboxes.innerHTML = albums.map(album => {
-    const isIn = album.artworks.includes(getPaintingId(painting));
+    const isIn = album.artworks.includes(paintingId);
     return `
       <label>
         <input type="checkbox" data-album-id="${album.id}" ${isIn ? 'checked' : ''}>
@@ -527,6 +629,20 @@ function renderAlbumCheckboxes() {
     `;
   }).join('');
 
+  // Show note section if in any album
+  const isInAnyAlbum = albums.some(a => a.artworks.includes(paintingId));
+  if (isInAnyAlbum) {
+    noteSection.classList.remove('hidden');
+    // Load existing note from the first album that has this artwork
+    const albumWithNote = albums.find(a =>
+      a.artworks.includes(paintingId) && a.notes && a.notes[paintingId]
+    );
+    noteInput.value = albumWithNote ? albumWithNote.notes[paintingId] : '';
+  } else {
+    noteSection.classList.add('hidden');
+    noteInput.value = '';
+  }
+
   albumCheckboxes.querySelectorAll('input').forEach(cb => {
     cb.addEventListener('change', (e) => {
       const albumId = e.target.dataset.albumId;
@@ -534,15 +650,37 @@ function renderAlbumCheckboxes() {
       if (!album) return;
 
       if (e.target.checked) {
-        if (!album.artworks.includes(getPaintingId(painting))) {
-          album.artworks.push(getPaintingId(painting));
+        if (!album.artworks.includes(paintingId)) {
+          album.artworks.push(paintingId);
         }
       } else {
-        album.artworks = album.artworks.filter(id => id !== getPaintingId(painting));
+        album.artworks = album.artworks.filter(id => id !== paintingId);
+        // Also remove note when removing from album
+        if (album.notes) {
+          delete album.notes[paintingId];
+        }
       }
       saveAlbums();
+
+      // Update note section visibility
+      const nowInAnyAlbum = albums.some(a => a.artworks.includes(paintingId));
+      if (nowInAnyAlbum) {
+        noteSection.classList.remove('hidden');
+      } else {
+        noteSection.classList.add('hidden');
+        noteInput.value = '';
+      }
     });
   });
+}
+
+// Simple debounce helper
+function debounce(fn, delay) {
+  let timeoutId;
+  return function(...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
 }
 
 // View switching
@@ -613,11 +751,16 @@ function renderAlbumDetail() {
   const emptyEl = document.getElementById('album-empty');
   const artworkEl = document.getElementById('album-artwork');
   const loadingEl = document.getElementById('album-loading');
+  const noteContainer = document.getElementById('album-note-container');
+  const noteDisplay = document.getElementById('album-note-display');
+  const addNoteBtn = document.getElementById('add-note-btn');
 
   if (album.artworks.length === 0) {
     emptyEl.classList.remove('hidden');
     artworkEl.classList.remove('loaded');
     loadingEl.classList.add('hidden');
+    noteContainer.classList.add('hidden');
+    addNoteBtn.classList.add('hidden');
     document.getElementById('album-art-title').textContent = '';
     document.getElementById('album-art-artist').textContent = '';
     document.getElementById('album-art-year').textContent = '';
@@ -625,8 +768,20 @@ function renderAlbumDetail() {
   }
 
   emptyEl.classList.add('hidden');
-  const painting = paintingsMap[album.artworks[currentAlbumIndex]];
+  const artworkId = album.artworks[currentAlbumIndex];
+  const painting = paintingsMap[artworkId];
   if (!painting) return;
+
+  // Show/hide note
+  const note = album.notes && album.notes[artworkId];
+  if (note) {
+    noteContainer.classList.remove('hidden');
+    noteDisplay.textContent = note;
+    addNoteBtn.classList.add('hidden');
+  } else {
+    noteContainer.classList.add('hidden');
+    addNoteBtn.classList.remove('hidden');
+  }
 
   loadingEl.classList.remove('hidden');
   artworkEl.classList.remove('loaded');
@@ -780,8 +935,24 @@ function loadSeen() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) {
-      // IDs are now image URLs (strings), but keep old number IDs for backwards compat
-      seen = new Set(JSON.parse(data));
+      const loadedIds = JSON.parse(data);
+      seen = new Set(loadedIds);
+
+      // Migrate: remove placeholder URLs from seen set
+      // These were incorrectly matching multiple paintings
+      let migrated = false;
+      for (const placeholder of PLACEHOLDER_IMAGES) {
+        if (seen.has(placeholder)) {
+          seen.delete(placeholder);
+          migrated = true;
+          console.log(`Migrated: removed placeholder URL from seen set`);
+        }
+      }
+
+      if (migrated) {
+        saveSeen();
+      }
+
       console.log(`Loaded ${seen.size} seen artworks`);
     }
   } catch (e) {

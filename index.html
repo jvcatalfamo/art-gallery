@@ -66,6 +66,9 @@
       <button id="close-save-panel" class="icon-btn small">×</button>
     </div>
     <div id="album-checkboxes"></div>
+    <div id="note-section" class="hidden">
+      <textarea id="note-input" placeholder="Add a note... (why you saved this)"></textarea>
+    </div>
   </div>
 
   <!-- Settings Panel -->
@@ -118,6 +121,19 @@
       <span id="album-art-artist"></span>
       <span id="album-art-year"></span>
     </div>
+    <div id="album-note-container" class="hidden">
+      <div id="album-note-display"></div>
+      <button id="edit-note-btn" class="icon-btn small" title="Edit Note">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+      </button>
+    </div>
+    <button id="add-note-btn" class="icon-btn note-btn hidden" title="Add Note">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+      </svg>
+    </button>
     <button id="remove-from-album-btn" class="icon-btn remove-btn" title="Remove from Album">
       <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
         <path d="M19 13H5v-2h14v2z"/>
@@ -195,6 +211,21 @@
       <p style="color: #aaa; margin-bottom: 16px; font-size: 14px;">Get your API key from <a href="https://console.anthropic.com/" target="_blank" style="color: #4a9eff;">console.anthropic.com</a></p>
       <input type="password" id="api-key-input" placeholder="sk-ant-..." style="width: 100%; padding: 12px; background: #333; border: none; border-radius: 6px; color: #fff; margin-bottom: 16px;">
       <button id="save-api-key" class="action-btn">Save Key</button>
+    </div>
+  </div>
+
+  <!-- Edit Note Modal -->
+  <div id="edit-note-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit Note</h2>
+        <button id="close-note-modal" class="icon-btn small">×</button>
+      </div>
+      <textarea id="edit-note-input" placeholder="Why did you save this artwork?"></textarea>
+      <div class="note-modal-buttons">
+        <button id="save-note-btn" class="action-btn">Save Note</button>
+        <button id="delete-note-btn" class="action-btn secondary">Delete Note</button>
+      </div>
     </div>
   </div>
 
