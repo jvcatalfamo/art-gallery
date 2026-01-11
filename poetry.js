@@ -88,11 +88,18 @@ async function loadPoems() {
     for (const result of results) {
       if (result.rows) {
         for (const row of result.rows) {
+          // Clean up poem content - fix line breaks
+          let content = row.row.content || '';
+          // Replace various line break formats
+          content = content.replace(/\r\n/g, '\n');
+          content = content.replace(/\r/g, '\n');
+          // Some poems have double spaces instead of line breaks
+          content = content.replace(/\.  +/g, '.\n\n');
+
           const poem = {
             title: row.row['poem name'] || 'Untitled',
             author: row.row.author || 'Unknown',
-            lines: (row.row.content || '').split('\n'),
-            content: row.row.content || ''
+            content: content
           };
 
           const id = getPoemId(poem);
@@ -123,11 +130,16 @@ async function fetchMorePoems() {
 
     if (result.rows) {
       for (const row of result.rows) {
+        // Clean up poem content - fix line breaks
+        let content = row.row.content || '';
+        content = content.replace(/\r\n/g, '\n');
+        content = content.replace(/\r/g, '\n');
+        content = content.replace(/\.  +/g, '.\n\n');
+
         const poem = {
           title: row.row['poem name'] || 'Untitled',
           author: row.row.author || 'Unknown',
-          lines: (row.row.content || '').split('\n'),
-          content: row.row.content || ''
+          content: content
         };
 
         const id = getPoemId(poem);
@@ -175,9 +187,12 @@ function showCurrentPoem() {
   saveSeen();
 
   // Display poem
-  poemText.textContent = poem.lines.join('\n');
+  poemText.textContent = poem.content;
   titleEl.textContent = poem.title || 'Untitled';
   artistEl.textContent = poem.author || 'Unknown';
+
+  // Scroll to top of poem
+  document.getElementById('poem-container').scrollTop = 0;
 }
 
 function next() {
@@ -592,7 +607,7 @@ function renderAlbumDetail() {
   }
 
   loadingEl.classList.add('hidden');
-  poemEl.textContent = poem.lines.join('\n');
+  poemEl.textContent = poem.content;
   document.getElementById('album-art-title').textContent = poem.title || 'Untitled';
   document.getElementById('album-art-artist').textContent = poem.author || 'Unknown';
   document.getElementById('album-detail-count').textContent =
@@ -682,7 +697,7 @@ function addNewAlbum() {
 
 // Render stats
 function renderStats() {
-  const total = poems.length;
+  const total = TOTAL_POEMS; // Use actual total from Poetry Foundation
   const seenCount = seen.size;
   const percent = total > 0 ? (seenCount / total * 100).toFixed(1) : 0;
 
