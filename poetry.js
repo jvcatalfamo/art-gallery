@@ -3,7 +3,6 @@
 const STORAGE_KEY = 'poetry_seen';
 const ALBUMS_KEY = 'poetry_albums';
 const BACKUP_KEY = 'poetry_backup_info';
-const API_URL = 'https://poetrydb.org/author';
 const BACKUP_REMINDER_THRESHOLD = 50;
 
 let poems = [];
@@ -64,12 +63,9 @@ async function loadPoems() {
   try {
     loadingEl.textContent = 'Loading poems...';
 
-    const response = await fetch(API_URL);
-    const authors = await response.json();
-
-    // Fetch poems for all authors (this gets all poems)
-    const allPoemsResponse = await fetch('https://poetrydb.org/title');
-    poems = await allPoemsResponse.json();
+    // Fetch a large batch of random poems
+    const response = await fetch('https://poetrydb.org/random/500');
+    poems = await response.json();
 
     // Build lookup map using title+author as ID
     poemsMap = {};
@@ -82,6 +78,26 @@ async function loadPoems() {
   } catch (e) {
     console.error('Failed to load poems:', e);
     loadingEl.textContent = 'Failed to load poems. Please refresh.';
+  }
+}
+
+// Fetch more poems when running low
+async function fetchMorePoems() {
+  try {
+    const response = await fetch('https://poetrydb.org/random/100');
+    const newPoems = await response.json();
+
+    for (const p of newPoems) {
+      const id = getPoemId(p);
+      if (!poemsMap[id]) {
+        poems.push(p);
+        poemsMap[id] = p;
+        orderedList.push(p);
+      }
+    }
+    console.log(`Total poems now: ${poems.length}`);
+  } catch (e) {
+    console.error('Failed to fetch more poems:', e);
   }
 }
 
@@ -125,6 +141,11 @@ function next() {
   currentIndex++;
   if (currentIndex >= orderedList.length) currentIndex = 0;
   showCurrentPoem();
+
+  // Fetch more poems when running low
+  if (orderedList.length - currentIndex < 50) {
+    fetchMorePoems();
+  }
 }
 
 function prev() {
