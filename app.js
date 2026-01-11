@@ -1,7 +1,6 @@
 // Art Gallery App
 
 const STORAGE_KEY = 'artgallery_seen';
-const SETTINGS_KEY = 'artgallery_settings';
 const ALBUMS_KEY = 'artgallery_albums';
 const BACKUP_KEY = 'artgallery_backup_info';
 const DATA_FILE = './data/paintings.json';
@@ -22,7 +21,6 @@ let paintingsMap = {};
 let orderedList = [];
 let currentIndex = 0;
 let seen = new Set();
-let settings = { sortOrder: 'unseen' };
 
 // Albums: { id: string, name: string, artworks: number[] }
 let albums = [];
@@ -58,8 +56,6 @@ const artistEl = document.getElementById('artist');
 const yearEl = document.getElementById('year');
 const statsBtn = document.getElementById('stats-btn');
 const backBtn = document.getElementById('back-btn');
-const settingsBtn = document.getElementById('settings-btn');
-const settingsPanel = document.getElementById('settings-panel');
 const resetBtn = document.getElementById('reset-btn');
 const albumsBtn = document.getElementById('albums-btn');
 const saveBtn = document.getElementById('save-btn');
@@ -70,7 +66,6 @@ const albumCheckboxes = document.getElementById('album-checkboxes');
 // Initialize
 async function init() {
   loadSeen();
-  loadSettings();
   loadAlbums();
   loadBackupInfo();
   await loadPaintings();
@@ -96,28 +91,9 @@ async function loadPaintings() {
   }
 }
 
-// Sorting functions
+// Sorting - always random
 function applySort() {
-  const unseenPaintings = paintings.filter(p => !seen.has(getPaintingId(p)));
-  const seenPaintings = paintings.filter(p => seen.has(getPaintingId(p)));
-
-  switch (settings.sortOrder) {
-    case 'random':
-      orderedList = shuffle([...paintings]);
-      break;
-    case 'chronological':
-      orderedList = [...paintings].sort((a, b) => (a.year || 0) - (b.year || 0));
-      break;
-    case 'artist':
-      orderedList = [...paintings].sort((a, b) =>
-        (a.artistName || '').localeCompare(b.artistName || '')
-      );
-      break;
-    case 'unseen':
-    default:
-      orderedList = [...shuffle(unseenPaintings), ...shuffle(seenPaintings)];
-      break;
-  }
+  orderedList = shuffle([...paintings]);
   currentIndex = 0;
 }
 
@@ -319,23 +295,6 @@ function setupTouchNav(img, prevFn, nextFn) {
 function showCurrentArtwork() {
   if (paintings.length === 0) return;
 
-  const unseenCount = paintings.filter(p => !seen.has(getPaintingId(p))).length;
-  if (unseenCount === 0 && settings.sortOrder === 'unseen') {
-    showCompleteMessage();
-    return;
-  }
-
-  if (settings.sortOrder === 'unseen') {
-    while (currentIndex < orderedList.length && seen.has(getPaintingId(orderedList[currentIndex]))) {
-      currentIndex++;
-    }
-    if (currentIndex >= orderedList.length) {
-      showCompleteMessage();
-      return;
-    }
-  }
-
-  hideCompleteMessage();
   const painting = orderedList[currentIndex];
   if (!painting) return;
 
@@ -435,7 +394,6 @@ function setupControls() {
     } else if (e.key === 's') {
       showStats();
     } else if (e.key === 'Escape') {
-      settingsPanel.classList.add('hidden');
       savePanel.classList.add('hidden');
     }
   });
@@ -455,29 +413,10 @@ function setupControls() {
   document.getElementById('albums-back-btn').addEventListener('click', showGallery);
   document.getElementById('album-detail-back-btn').addEventListener('click', showAlbums);
 
-  // Settings
-  settingsBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    settingsPanel.classList.toggle('hidden');
-    savePanel.classList.add('hidden');
-  });
-
-  document.querySelectorAll('input[name="sort"]').forEach(radio => {
-    radio.checked = radio.value === settings.sortOrder;
-    radio.addEventListener('change', (e) => {
-      settings.sortOrder = e.target.value;
-      saveSettings();
-      applySort();
-      showCurrentArtwork();
-      settingsPanel.classList.add('hidden');
-    });
-  });
-
   // Save to album
   saveBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     savePanel.classList.toggle('hidden');
-    settingsPanel.classList.add('hidden');
     if (!savePanel.classList.contains('hidden')) {
       renderAlbumCheckboxes();
     }
@@ -489,9 +428,6 @@ function setupControls() {
 
   // Close panels on outside click
   document.addEventListener('click', (e) => {
-    if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
-      settingsPanel.classList.add('hidden');
-    }
     if (!savePanel.contains(e.target) && e.target !== saveBtn) {
       savePanel.classList.add('hidden');
     }
@@ -959,25 +895,6 @@ function saveSeen() {
   }
 }
 
-function loadSettings() {
-  try {
-    const data = localStorage.getItem(SETTINGS_KEY);
-    if (data) {
-      settings = { ...settings, ...JSON.parse(data) };
-    }
-  } catch (e) {
-    console.error('Failed to load settings:', e);
-  }
-}
-
-function saveSettings() {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  } catch (e) {
-    console.error('Failed to save settings:', e);
-  }
-}
-
 function loadAlbums() {
   try {
     const data = localStorage.getItem(ALBUMS_KEY);
@@ -1043,8 +960,7 @@ function exportData() {
     version: 1,
     exportDate: new Date().toISOString(),
     seen: [...seen],
-    albums: albums,
-    settings: settings
+    albums: albums
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1079,11 +995,6 @@ function importData(file) {
       if (data.albums && Array.isArray(data.albums)) {
         albums = data.albums;
         saveAlbums();
-      }
-
-      if (data.settings) {
-        settings = { ...settings, ...data.settings };
-        saveSettings();
       }
 
       // Update backup info
