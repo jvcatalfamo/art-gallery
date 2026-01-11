@@ -883,7 +883,7 @@ html, body {
   align-items: center;
   justify-content: flex-start;
   overflow-y: auto;
-  padding: 80px 20px 100px;
+  padding: 70px 20px 100px;
   background: #111;
 }
 
@@ -896,7 +896,6 @@ html, body {
   white-space: pre-wrap;
   text-align: center;
   font-family: Georgia, 'Times New Roman', serif;
-  padding-top: 20px;
 }
 
 #poem-loading {

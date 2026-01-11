@@ -88,13 +88,17 @@ async function loadPoems() {
     for (const result of results) {
       if (result.rows) {
         for (const row of result.rows) {
-          // Clean up poem content - fix line breaks
+          // Clean up poem content - fix line breaks and spacing
           let content = row.row.content || '';
           // Replace various line break formats
           content = content.replace(/\r\n/g, '\n');
           content = content.replace(/\r/g, '\n');
-          // Some poems have double spaces instead of line breaks
-          content = content.replace(/\.  +/g, '.\n\n');
+          // Fix words that got merged (lowercase followed by uppercase = new line)
+          content = content.replace(/([a-z])([A-Z])/g, '$1\n$2');
+          // Fix common word merges (lowercase + common words)
+          content = content.replace(/([a-z])(the |The |and |And |of |Of |to |To |in |In |a |A |is |Is |it |It |as |As |or |Or |but |But |for |For |with |With |that |That |this |This |from |From |by |By |on |On |at |At |an |An )/g, '$1\n$2');
+          // Fix punctuation followed by letter (missing line break)
+          content = content.replace(/([.!?;:,])([A-Z])/g, '$1\n$2');
 
           const poem = {
             title: row.row['poem name'] || 'Untitled',
@@ -130,11 +134,17 @@ async function fetchMorePoems() {
 
     if (result.rows) {
       for (const row of result.rows) {
-        // Clean up poem content - fix line breaks
+        // Clean up poem content - fix line breaks and spacing
         let content = row.row.content || '';
+        // Replace various line break formats
         content = content.replace(/\r\n/g, '\n');
         content = content.replace(/\r/g, '\n');
-        content = content.replace(/\.  +/g, '.\n\n');
+        // Fix words that got merged (lowercase followed by uppercase = new line)
+        content = content.replace(/([a-z])([A-Z])/g, '$1\n$2');
+        // Fix common word merges (lowercase + common words)
+        content = content.replace(/([a-z])(the |The |and |And |of |Of |to |To |in |In |a |A |is |Is |it |It |as |As |or |Or |but |But |for |For |with |With |that |That |this |This |from |From |by |By |on |On |at |At |an |An )/g, '$1\n$2');
+        // Fix punctuation followed by letter (missing line break)
+        content = content.replace(/([.!?;:,])([A-Z])/g, '$1\n$2');
 
         const poem = {
           title: row.row['poem name'] || 'Untitled',
