@@ -8,24 +8,14 @@ const DATA_FILE = './data/paintings.json';
 const BACKUP_REMINDER_THRESHOLD = 50; // Remind after 50 new artworks
 const API_KEY_STORAGE = 'artgallery_apikey';
 
-// AI prompts - title/artist will be prepended
-const LITERAL_PROMPT = `Using the title and artist info provided, describe what is literally depicted:
+// AI prompt - combines literal description with deeper meaning
+const AI_PROMPT = `Using the title and artist info provided, give an integrated interpretation of this painting:
 
-- Who are the specific people/figures? (Use the title to identify them)
-- What scene or event is shown?
-- Key objects, setting, and composition
-- Colors, lighting, atmosphere
+Start by describing what we see - the scene, figures, setting, and notable visual elements. Use the title to identify who or what is depicted.
 
-Be specific and use the title context. Keep it concise (2-3 paragraphs).`;
+Then naturally flow into the deeper context: Why did the artist paint this? What was happening historically or in their life? What symbolism or meaning is embedded in the work? How does this fit into their artistic journey or the broader art movement?
 
-const MEANING_PROMPT = `Using the title and artist info provided, explain the deeper meaning:
-
-- Historical context - what event/period is this? Why did the artist paint it?
-- Who commissioned it and why? What was the artist's relationship to the subject?
-- Symbolism and what the artist was trying to convey
-- How this fits in the artist's body of work or the art movement
-
-Be insightful and use the title/artist context. Keep it concise (2-3 paragraphs).`;
+Write it as a cohesive narrative, not separate sections. Be engaging and insightful. Keep it to 3-4 paragraphs.`;
 
 let paintings = [];
 let paintingsMap = {};
@@ -1159,16 +1149,14 @@ function setupBackupControls() {
 
 // AI Interpretation functions
 function setupAIControls() {
-  const literalBtn = document.getElementById('ai-literal-btn');
-  const meaningBtn = document.getElementById('ai-meaning-btn');
+  const aiBtn = document.getElementById('ai-btn');
   const aiModal = document.getElementById('ai-modal');
   const closeAiModal = document.getElementById('close-ai-modal');
   const apiKeyModal = document.getElementById('api-key-modal');
   const closeApiModal = document.getElementById('close-api-modal');
   const saveApiKeyBtn = document.getElementById('save-api-key');
 
-  literalBtn.addEventListener('click', () => requestInterpretation('literal'));
-  meaningBtn.addEventListener('click', () => requestInterpretation('meaning'));
+  aiBtn.addEventListener('click', () => requestInterpretation());
 
   closeAiModal.addEventListener('click', () => aiModal.classList.add('hidden'));
   closeApiModal.addEventListener('click', () => apiKeyModal.classList.add('hidden'));
@@ -1180,7 +1168,8 @@ function setupAIControls() {
       apiKeyModal.classList.add('hidden');
       // Retry the last request
       if (window.pendingAIRequest) {
-        requestInterpretation(window.pendingAIRequest);
+        requestInterpretation();
+        window.pendingAIRequest = false;
       }
     }
   });
@@ -1215,10 +1204,10 @@ async function imageToBase64(url) {
   });
 }
 
-async function requestInterpretation(type) {
+async function requestInterpretation() {
   const apiKey = localStorage.getItem(API_KEY_STORAGE);
   if (!apiKey) {
-    window.pendingAIRequest = type;
+    window.pendingAIRequest = true;
     document.getElementById('api-key-modal').classList.remove('hidden');
     return;
   }
@@ -1231,8 +1220,8 @@ async function requestInterpretation(type) {
   const aiLoading = document.getElementById('ai-loading');
   const aiText = document.getElementById('ai-text');
 
-  // Set title based on type
-  aiTitle.textContent = type === 'literal' ? 'What\'s in this painting' : 'Deeper meaning';
+  // Set title
+  aiTitle.textContent = 'About this painting';
 
   // Show modal with breathing orb and cycling text
   aiModal.classList.remove('hidden');
@@ -1251,12 +1240,10 @@ async function requestInterpretation(type) {
   // Store interval to clear later
   window.breathInterval = breathInterval;
 
-  // Disable buttons while loading
-  document.getElementById('ai-literal-btn').disabled = true;
-  document.getElementById('ai-meaning-btn').disabled = true;
+  // Disable button while loading
+  document.getElementById('ai-btn').disabled = true;
 
   try {
-    const prompt = type === 'literal' ? LITERAL_PROMPT : MEANING_PROMPT;
     const imageUrl = cleanImageUrl(painting.image);
 
     // Convert image to base64 (WikiArt URLs can't be fetched directly by Claude)
@@ -1291,7 +1278,7 @@ Title: "${painting.title}"
 Artist: ${painting.artistName}
 ${painting.completitionYear ? `Year: ${painting.completitionYear}` : ''}
 
-${prompt}`
+${AI_PROMPT}`
             }
           ]
         }]
@@ -1322,8 +1309,7 @@ ${prompt}`
       aiText.textContent = `Error: ${error.message}`;
     }
   } finally {
-    document.getElementById('ai-literal-btn').disabled = false;
-    document.getElementById('ai-meaning-btn').disabled = false;
+    document.getElementById('ai-btn').disabled = false;
   }
 }
 

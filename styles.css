@@ -175,16 +175,11 @@ html, body {
   background: rgba(255, 100, 100, 1);
 }
 
-/* AI buttons */
-#ai-buttons {
+/* AI button */
+#ai-btn {
   position: absolute;
   bottom: 80px;
   left: 16px;
-  display: flex;
-  gap: 8px;
-}
-
-.ai-btn {
   background: rgba(255, 255, 255, 0.15);
   border: none;
   border-radius: 50%;
@@ -198,12 +193,12 @@ html, body {
   transition: all 0.2s;
 }
 
-.ai-btn:hover {
+#ai-btn:hover {
   background: rgba(255, 255, 255, 0.25);
   color: #fff;
 }
 
-.ai-btn:disabled {
+#ai-btn:disabled {
   opacity: 0.5;
   cursor: wait;
 }
