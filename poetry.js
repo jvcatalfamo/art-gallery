@@ -5,10 +5,9 @@ const ALBUMS_KEY = 'poetry_albums';
 const BACKUP_KEY = 'poetry_backup_info';
 const BACKUP_REMINDER_THRESHOLD = 50;
 
-// Hugging Face datasets API for Poetry Foundation data (13,854 poems)
-const HF_API = 'https://datasets-server.huggingface.co/rows';
-const DATASET = 'shahules786/PoetryFoundationData';
-const TOTAL_POEMS = 13854;
+// Local poetry data (800 poems from Poetry Foundation)
+const POEMS_DATA_URL = 'poems-data.json';
+const TOTAL_POEMS = 800;
 
 let poems = [];
 let poemsMap = {};
@@ -139,47 +138,33 @@ function cleanPoemContent(content) {
   return result.join('\n');
 }
 
-// Load poems from Poetry Foundation (via Hugging Face)
+// Load poems from local JSON file
 async function loadPoems() {
   try {
-    loadingEl.textContent = 'Loading Poetry Foundation poems...';
+    loadingEl.textContent = 'Loading poems...';
 
-    // Generate random offsets to get varied poems
-    const batchSize = 100;
-    const numBatches = 5;
-    const fetches = [];
-
-    for (let i = 0; i < numBatches; i++) {
-      const randomOffset = Math.floor(Math.random() * (TOTAL_POEMS - batchSize));
-      const url = `${HF_API}?dataset=${DATASET}&config=default&split=train&offset=${randomOffset}&length=${batchSize}`;
-      fetches.push(fetch(url).then(r => r.json()));
-    }
-
-    const results = await Promise.all(fetches);
+    const response = await fetch(POEMS_DATA_URL);
+    const data = await response.json();
 
     // Transform and dedupe poems
     poems = [];
     poemsMap = {};
 
-    for (const result of results) {
-      if (result.rows) {
-        for (const row of result.rows) {
-          const poem = {
-            title: row.row['poem name'] || 'Untitled',
-            author: row.row.author || 'Unknown',
-            content: cleanPoemContent(row.row.content)
-          };
+    for (const item of data) {
+      const poem = {
+        title: (item.title || 'Untitled').trim(),
+        author: (item.author || 'Unknown').trim(),
+        content: cleanPoemContent(item.content)
+      };
 
-          const id = getPoemId(poem);
-          if (!poemsMap[id]) {
-            poems.push(poem);
-            poemsMap[id] = poem;
-          }
-        }
+      const id = getPoemId(poem);
+      if (!poemsMap[id]) {
+        poems.push(poem);
+        poemsMap[id] = poem;
       }
     }
 
-    console.log(`Loaded ${poems.length} poems from Poetry Foundation`);
+    console.log(`Loaded ${poems.length} poems`);
     loadingEl.textContent = '';
   } catch (e) {
     console.error('Failed to load poems:', e);
@@ -187,34 +172,12 @@ async function loadPoems() {
   }
 }
 
-// Fetch more poems when running low
-async function fetchMorePoems() {
-  try {
-    const randomOffset = Math.floor(Math.random() * (TOTAL_POEMS - 100));
-    const url = `${HF_API}?dataset=${DATASET}&config=default&split=train&offset=${randomOffset}&length=100`;
-
-    const response = await fetch(url);
-    const result = await response.json();
-
-    if (result.rows) {
-      for (const row of result.rows) {
-        const poem = {
-          title: row.row['poem name'] || 'Untitled',
-          author: row.row.author || 'Unknown',
-          content: cleanPoemContent(row.row.content)
-        };
-
-        const id = getPoemId(poem);
-        if (!poemsMap[id]) {
-          poems.push(poem);
-          poemsMap[id] = poem;
-          orderedList.push(poem);
-        }
-      }
-    }
-    console.log(`Total poems now: ${poems.length}`);
-  } catch (e) {
-    console.error('Failed to fetch more poems:', e);
+// All poems are loaded from local file, so this just reshuffles when needed
+function fetchMorePoems() {
+  // Reshuffle to give variety when cycling through
+  if (currentIndex >= orderedList.length - 1) {
+    orderedList = shuffle([...poems]);
+    currentIndex = 0;
   }
 }
 
