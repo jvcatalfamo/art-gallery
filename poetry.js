@@ -109,9 +109,37 @@ function cleanPoemContent(content) {
 
   // Pattern 3: words concatenated with common line-starting words
   // These patterns occur when newlines were stripped between lines
-  const lineStarters = 'the|and|in|of|to|a|for|with|on|at|by|from|or|but|so|if|as|an|it|I|we|he|she|they|you|that|this|who|where|when|my|your|our|his|her|its|their|one|all|no|not|be|is|are|was|were|have|has|had|do|does|did|will|would|could|should|can|may|might|must|like|into|over|under|through|before|after|between|out|up|down|off|away|back|here|there|now|then|how|why|what|which';
-  const lineStarterRegex = new RegExp(`([a-z])\\b(${lineStarters})\\b`, 'g');
-  content = content.replace(lineStarterRegex, '$1\n$2');
+  // Use {2,} to require at least 2 chars before the split (avoids false positives)
+  // Remove \b before lineStarters since there's no word boundary in concatenated words
+  const lineStarters = 'the|and|in|of|to|a|for|with|on|at|by|from|or|but|so|if|as|an|it|I|we|he|she|they|you|that|this|who|where|when|my|your|our|his|her|its|their|one|all|no|not|be|is|are|was|were|have|has|had|do|does|did|will|would|could|should|can|may|might|must|like|into|over|under|through|before|after|between|out|up|down|off|away|back|here|there|now|then|how|why|what|which|without|night|each|every|some|any|such|only|just|still|yet|while|because|since|until|unless|than|even|ever|never|more|most|much|many|other|both|few|little|own|same|new|old|first|last|long|great|good|right|well|way|too|very|also|burdens|parts|them';
+
+  // Words that should NOT be split (legitimate words containing lineStarters)
+  const noSplitWords = new Set([
+    'into', 'onto', 'unto', 'there', 'where', 'therefore', 'whereas', 'whereby',
+    'wherein', 'wherever', 'whoever', 'whatever', 'whenever', 'however', 'moreover',
+    'furthermore', 'otherwise', 'likewise', 'somehow', 'anyhow', 'somewhat', 'although',
+    'together', 'altogether', 'another', 'whether', 'neither', 'either', 'father',
+    'mother', 'brother', 'other', 'rather', 'weather', 'leather', 'feather', 'gather',
+    'lather', 'withstand', 'withdraw', 'within', 'without', 'throughout', 'outside',
+    'inside', 'beside', 'besides', 'before', 'behind', 'below', 'beneath', 'beyond',
+    'between', 'toward', 'towards', 'forward', 'afterward', 'backward', 'outward',
+    'inward', 'upward', 'downward', 'nothing', 'something', 'anything', 'everything'
+  ]);
+
+  // Split content into words, process each, rejoin
+  const lineStarterRegex = new RegExp(`^(.+?)(${lineStarters})$`, 'i');
+  content = content.split(/(\s+)/).map(part => {
+    // Keep whitespace as-is
+    if (/^\s+$/.test(part)) return part;
+    // Don't split known legitimate words
+    if (noSplitWords.has(part.toLowerCase())) return part;
+    // Try to split concatenated words
+    const match = part.match(lineStarterRegex);
+    if (match && match[1].length >= 2) {
+      return match[1] + '\n' + match[2];
+    }
+    return part;
+  }).join('');
 
   // Collapse multiple consecutive newlines into double newline (stanza break)
   content = content.replace(/\n{3,}/g, '\n\n');
