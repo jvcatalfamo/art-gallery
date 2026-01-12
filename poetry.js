@@ -113,18 +113,22 @@ function cleanPoemContent(content) {
   const lineStarterRegex = new RegExp(`([a-z])\\b(${lineStarters})\\b`, 'g');
   content = content.replace(lineStarterRegex, '$1\n$2');
 
-  // Trim leading/trailing whitespace from each line but preserve line structure
-  const lines = content.split('\n');
-  const cleanedLines = lines.map(line => line.trim()).filter((line, i, arr) => {
-    // Keep the line if it has content, or if it's an empty line between content (stanza break)
-    if (line) return true;
-    // Keep empty lines that are between content lines (stanza breaks)
-    const prevHasContent = arr.slice(0, i).some(l => l);
-    const nextHasContent = arr.slice(i + 1).some(l => l);
-    return prevHasContent && nextHasContent;
-  });
+  // Collapse multiple consecutive newlines into double newline (stanza break)
+  content = content.replace(/\n{3,}/g, '\n\n');
 
-  return cleanedLines.join('\n');
+  // Trim leading/trailing whitespace from each line
+  const lines = content.split('\n');
+  const cleanedLines = lines.map(line => line.trim());
+
+  // Remove leading and trailing empty lines, but preserve internal stanza breaks
+  let start = 0;
+  let end = cleanedLines.length - 1;
+  while (start < cleanedLines.length && !cleanedLines[start]) start++;
+  while (end >= 0 && !cleanedLines[end]) end--;
+
+  const trimmedLines = cleanedLines.slice(start, end + 1);
+
+  return trimmedLines.join('\n');
 }
 
 // Load poems from local JSON file
