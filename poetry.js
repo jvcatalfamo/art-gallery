@@ -62,30 +62,43 @@ async function init() {
   setupBackupControls();
 }
 
-// Clean up poem content - fix hard-wrapped lines that split words
+// Fix encoding issues - garbled UTF-8 smart quotes and dashes
+function fixEncoding(text) {
+  if (!text) return '';
+
+  // These patterns occur when UTF-8 is misinterpreted
+  text = text.replace(/â€™/g, "'");      // right single quote
+  text = text.replace(/â€˜/g, "'");      // left single quote
+  text = text.replace(/â€œ/g, '"');      // left double quote
+  text = text.replace(/â€/g, '"');       // right double quote (partial)
+  text = text.replace(/â€"/g, '—');      // em-dash
+  text = text.replace(/â€"/g, '–');      // en-dash
+  text = text.replace(/â€¦/g, '...');    // ellipsis
+  text = text.replace(/Ã¢â‚¬â„¢/g, "'"); // deeply garbled apostrophe
+  text = text.replace(/Ã¢â‚¬/g, '"');    // deeply garbled quote
+  // Clean up any remaining garbled sequences (â followed by box/special characters)
+  text = text.replace(/â[\u0080-\u00FF][\u0080-\u00FF]/g, "'");
+  text = text.replace(/â\s*□\s*□/g, "'");
+  text = text.replace(/â€[^a-zA-Z]/g, "'"); // catch remaining variants
+
+  return text;
+}
+
+// Clean up poem content - fix encoding and line breaks
 function cleanPoemContent(content) {
   if (!content) return '';
 
-  // Fix encoding issues - garbled UTF-8 smart quotes and dashes
-  // These patterns occur when UTF-8 is misinterpreted
-  content = content.replace(/â€™/g, "'");      // right single quote
-  content = content.replace(/â€˜/g, "'");      // left single quote
-  content = content.replace(/â€œ/g, '"');      // left double quote
-  content = content.replace(/â€/g, '"');       // right double quote (partial)
-  content = content.replace(/â€"/g, '—');      // em-dash
-  content = content.replace(/â€"/g, '–');      // en-dash
-  content = content.replace(/â€¦/g, '...');    // ellipsis
-  content = content.replace(/â€˜/g, "'");      // another single quote variant
-  content = content.replace(/Ã¢â‚¬â„¢/g, "'"); // deeply garbled apostrophe
-  content = content.replace(/Ã¢â‚¬/g, '"');    // deeply garbled quote
-  // Clean up any remaining garbled sequences (â followed by box characters)
-  content = content.replace(/â[\u0080-\u00FF][\u0080-\u00FF]/g, "'");
-  content = content.replace(/â\s*□\s*□/g, "'");
+  // Fix encoding issues
+  content = fixEncoding(content);
 
   // Normalize line breaks - handle \r\r\n pattern in the data
   content = content.replace(/\r\r\n/g, '\n');
   content = content.replace(/\r\n/g, '\n');
   content = content.replace(/\r/g, '\n');
+
+  // Some poems use multiple spaces (2+) as line separators instead of newlines
+  // Convert these to newlines
+  content = content.replace(/  +/g, '\n');
 
   // Trim leading/trailing whitespace from each line but preserve line structure
   const lines = content.split('\n');
@@ -115,8 +128,8 @@ async function loadPoems() {
 
     for (const item of data) {
       const poem = {
-        title: (item.title || 'Untitled').trim(),
-        author: (item.author || 'Unknown').trim(),
+        title: fixEncoding((item.title || 'Untitled').trim()),
+        author: fixEncoding((item.author || 'Unknown').trim()),
         content: cleanPoemContent(item.content)
       };
 
