@@ -63,6 +63,79 @@ async function init() {
   setupBackupControls();
 }
 
+// Clean up poem content - fix hard-wrapped lines that split words
+function cleanPoemContent(content) {
+  if (!content) return '';
+
+  // Normalize line breaks
+  content = content.replace(/\r\n/g, '\n');
+  content = content.replace(/\r/g, '\n');
+
+  // Preserve stanza breaks (double newlines) by using a placeholder
+  content = content.replace(/\n\n+/g, '\n\n§STANZA§\n\n');
+
+  // Split into lines
+  const lines = content.split('\n');
+  const result = [];
+  let currentLine = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Skip empty lines (stanza breaks handled separately)
+    if (!line) continue;
+
+    // Handle stanza marker - output accumulated line first
+    if (line === '§STANZA§') {
+      if (currentLine) {
+        result.push(currentLine);
+        currentLine = '';
+      }
+      result.push('');
+      continue;
+    }
+
+    // If no accumulated line, start fresh
+    if (!currentLine) {
+      currentLine = line;
+      continue;
+    }
+
+    // Check if current accumulated line was probably hard-wrapped
+    const endsWithLowercase = /[a-z]$/.test(currentLine);
+    const startsWithLowercase = /^[a-z]/.test(line);
+    const endsWithPunctuation = /[.!?,;:'")\-—]$/.test(currentLine);
+
+    if (endsWithLowercase && startsWithLowercase && !endsWithPunctuation) {
+      // Determine if this was mid-word split or word boundary
+      // Get the last "word fragment" (text after last space)
+      const lastSpaceIdx = currentLine.lastIndexOf(' ');
+      const tailFragment = lastSpaceIdx >= 0 ? currentLine.slice(lastSpaceIdx + 1) : currentLine;
+
+      // If tail is very short (1-3 chars), it's likely a mid-word split
+      // Join without space to reconstruct the word
+      if (tailFragment.length <= 3) {
+        currentLine = currentLine + line;
+      } else {
+        // Tail is longer, likely a complete word - add space between
+        currentLine = currentLine + ' ' + line;
+      }
+    } else {
+      // This looks like a natural line break, save current line and start new one
+      result.push(currentLine);
+      currentLine = line;
+    }
+  }
+
+  // Don't forget the last line
+  if (currentLine) {
+    result.push(currentLine);
+  }
+
+  // Join lines back together
+  return result.join('\n');
+}
+
 // Load poems from Poetry Foundation (via Hugging Face)
 async function loadPoems() {
   try {
@@ -88,22 +161,10 @@ async function loadPoems() {
     for (const result of results) {
       if (result.rows) {
         for (const row of result.rows) {
-          // Clean up poem content - fix line breaks and spacing
-          let content = row.row.content || '';
-          // Replace various line break formats
-          content = content.replace(/\r\n/g, '\n');
-          content = content.replace(/\r/g, '\n');
-          // Fix words that got merged (lowercase followed by uppercase = new line)
-          content = content.replace(/([a-z])([A-Z])/g, '$1\n$2');
-          // Fix common word merges (lowercase + common words)
-          content = content.replace(/([a-z])(the |The |and |And |of |Of |to |To |in |In |a |A |is |Is |it |It |as |As |or |Or |but |But |for |For |with |With |that |That |this |This |from |From |by |By |on |On |at |At |an |An )/g, '$1\n$2');
-          // Fix punctuation followed by letter (missing line break)
-          content = content.replace(/([.!?;:,])([A-Z])/g, '$1\n$2');
-
           const poem = {
             title: row.row['poem name'] || 'Untitled',
             author: row.row.author || 'Unknown',
-            content: content
+            content: cleanPoemContent(row.row.content)
           };
 
           const id = getPoemId(poem);
@@ -134,22 +195,10 @@ async function fetchMorePoems() {
 
     if (result.rows) {
       for (const row of result.rows) {
-        // Clean up poem content - fix line breaks and spacing
-        let content = row.row.content || '';
-        // Replace various line break formats
-        content = content.replace(/\r\n/g, '\n');
-        content = content.replace(/\r/g, '\n');
-        // Fix words that got merged (lowercase followed by uppercase = new line)
-        content = content.replace(/([a-z])([A-Z])/g, '$1\n$2');
-        // Fix common word merges (lowercase + common words)
-        content = content.replace(/([a-z])(the |The |and |And |of |Of |to |To |in |In |a |A |is |Is |it |It |as |As |or |Or |but |But |for |For |with |With |that |That |this |This |from |From |by |By |on |On |at |At |an |An )/g, '$1\n$2');
-        // Fix punctuation followed by letter (missing line break)
-        content = content.replace(/([.!?;:,])([A-Z])/g, '$1\n$2');
-
         const poem = {
           title: row.row['poem name'] || 'Untitled',
           author: row.row.author || 'Unknown',
-          content: content
+          content: cleanPoemContent(row.row.content)
         };
 
         const id = getPoemId(poem);
