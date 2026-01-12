@@ -62,7 +62,7 @@ async function init() {
   setupBackupControls();
 }
 
-// Fix encoding issues - garbled UTF-8 smart quotes and dashes
+// Fix encoding issues - garbled UTF-8 smart quotes, dashes, and accented characters
 function fixEncoding(text) {
   if (!text) return '';
 
@@ -76,6 +76,31 @@ function fixEncoding(text) {
   text = text.replace(/â€¦/g, '...');    // ellipsis
   text = text.replace(/Ã¢â‚¬â„¢/g, "'"); // deeply garbled apostrophe
   text = text.replace(/Ã¢â‚¬/g, '"');    // deeply garbled quote
+
+  // Garbled accented characters (UTF-8 interpreted as Latin-1)
+  text = text.replace(/Ã©/g, 'é');       // e-acute
+  text = text.replace(/Ã¨/g, 'è');       // e-grave
+  text = text.replace(/Ã«/g, 'ë');       // e-umlaut
+  text = text.replace(/Ãª/g, 'ê');       // e-circumflex
+  text = text.replace(/Ã¡/g, 'á');       // a-acute
+  text = text.replace(/Ã /g, 'à');       // a-grave
+  text = text.replace(/Ã¤/g, 'ä');       // a-umlaut
+  text = text.replace(/Ã¢/g, 'â');       // a-circumflex
+  text = text.replace(/Ã­/g, 'í');       // i-acute
+  text = text.replace(/Ã¬/g, 'ì');       // i-grave
+  text = text.replace(/Ã¯/g, 'ï');       // i-umlaut
+  text = text.replace(/Ã®/g, 'î');       // i-circumflex
+  text = text.replace(/Ã³/g, 'ó');       // o-acute
+  text = text.replace(/Ã²/g, 'ò');       // o-grave
+  text = text.replace(/Ã¶/g, 'ö');       // o-umlaut
+  text = text.replace(/Ã´/g, 'ô');       // o-circumflex
+  text = text.replace(/Ãº/g, 'ú');       // u-acute
+  text = text.replace(/Ã¹/g, 'ù');       // u-grave
+  text = text.replace(/Ã¼/g, 'ü');       // u-umlaut
+  text = text.replace(/Ã»/g, 'û');       // u-circumflex
+  text = text.replace(/Ã±/g, 'ñ');       // n-tilde
+  text = text.replace(/Ã§/g, 'ç');       // c-cedilla
+
   // Clean up any remaining garbled sequences (â followed by box/special characters)
   text = text.replace(/â[\u0080-\u00FF][\u0080-\u00FF]/g, "'");
   text = text.replace(/â\s*□\s*□/g, "'");
@@ -108,34 +133,19 @@ function cleanPoemContent(content) {
   content = content.replace(/([.!?;:,])([A-Za-z])/g, '$1\n$2');
 
   // Pattern 3: words concatenated with common line-starting words
-  // These patterns occur when newlines were stripped between lines
-  // Use {2,} to require at least 2 chars before the split (avoids false positives)
-  // Remove \b before lineStarters since there's no word boundary in concatenated words
-  const lineStarters = 'the|and|in|of|to|a|for|with|on|at|by|from|or|but|so|if|as|an|it|I|we|he|she|they|you|that|this|who|where|when|my|your|our|his|her|its|their|one|all|no|not|be|is|are|was|were|have|has|had|do|does|did|will|would|could|should|can|may|might|must|like|into|over|under|through|before|after|between|out|up|down|off|away|back|here|there|now|then|how|why|what|which|without|night|each|every|some|any|such|only|just|still|yet|while|because|since|until|unless|than|even|ever|never|more|most|much|many|other|both|few|little|own|same|new|old|first|last|long|great|good|right|well|way|too|very|also|burdens|parts|them';
+  // VERY CONSERVATIVE - only use words that rarely end legitimate English words
+  // Words like "it", "at", "in", "an", "be", "one", "or", "is" are TOO DANGEROUS
+  // because they appear at the end of many words (wait, what, rain, can, maybe, done, for, this)
+  const safeLineStarters = 'the|and|for|with|from|they|your|their|have|would|could|should|because|through|between|without|before|after|under|over|about|these|those|which|where|while|during|against|toward|upon|within|beyond|behind|below|above|across|along|among|around|beneath|beside|despite|except|inside|outside|unlike|until|throughout|whenever|wherever|however|whatever|whoever|although|whereas|whereby|wherein|therefore|furthermore|moreover|nevertheless|nonetheless|otherwise|meanwhile|afterwards|beforehand|henceforth|thereafter|whereupon';
 
-  // Words that should NOT be split (legitimate words containing lineStarters)
-  const noSplitWords = new Set([
-    'into', 'onto', 'unto', 'there', 'where', 'therefore', 'whereas', 'whereby',
-    'wherein', 'wherever', 'whoever', 'whatever', 'whenever', 'however', 'moreover',
-    'furthermore', 'otherwise', 'likewise', 'somehow', 'anyhow', 'somewhat', 'although',
-    'together', 'altogether', 'another', 'whether', 'neither', 'either', 'father',
-    'mother', 'brother', 'other', 'rather', 'weather', 'leather', 'feather', 'gather',
-    'lather', 'withstand', 'withdraw', 'within', 'without', 'throughout', 'outside',
-    'inside', 'beside', 'besides', 'before', 'behind', 'below', 'beneath', 'beyond',
-    'between', 'toward', 'towards', 'forward', 'afterward', 'backward', 'outward',
-    'inward', 'upward', 'downward', 'nothing', 'something', 'anything', 'everything'
-  ]);
-
-  // Split content into words, process each, rejoin
-  const lineStarterRegex = new RegExp(`^(.+?)(${lineStarters})$`, 'i');
+  // Only apply to longer words (10+ chars) to catch concatenations like "perturbationsof"
+  const lineStarterRegex = new RegExp(`^(.{4,})(${safeLineStarters})$`, 'i');
   content = content.split(/(\s+)/).map(part => {
-    // Keep whitespace as-is
     if (/^\s+$/.test(part)) return part;
-    // Don't split known legitimate words
-    if (noSplitWords.has(part.toLowerCase())) return part;
-    // Try to split concatenated words
+    // Only try splitting longer words
+    if (part.length < 10) return part;
     const match = part.match(lineStarterRegex);
-    if (match && match[1].length >= 2) {
+    if (match) {
       return match[1] + '\n' + match[2];
     }
     return part;
