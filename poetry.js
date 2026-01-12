@@ -100,6 +100,19 @@ function cleanPoemContent(content) {
   // Convert these to newlines
   content = content.replace(/  +/g, '\n');
 
+  // Fix concatenated words where line breaks were stripped
+  // Pattern 1: lowercase followed by uppercase (e.g., "fittingArtemisia" → "fitting\nArtemisia")
+  content = content.replace(/([a-z])([A-Z])/g, '$1\n$2');
+
+  // Pattern 2: common line-ending punctuation followed by letter without space
+  content = content.replace(/([.!?;:,])([A-Za-z])/g, '$1\n$2');
+
+  // Pattern 3: words concatenated with common line-starting words
+  // These patterns occur when newlines were stripped between lines
+  const lineStarters = 'the|and|in|of|to|a|for|with|on|at|by|from|or|but|so|if|as|an|it|I|we|he|she|they|you|that|this|who|where|when|my|your|our|his|her|its|their|one|all|no|not|be|is|are|was|were|have|has|had|do|does|did|will|would|could|should|can|may|might|must|like|into|over|under|through|before|after|between|out|up|down|off|away|back|here|there|now|then|how|why|what|which';
+  const lineStarterRegex = new RegExp(`([a-z])\\b(${lineStarters})\\b`, 'g');
+  content = content.replace(lineStarterRegex, '$1\n$2');
+
   // Trim leading/trailing whitespace from each line but preserve line structure
   const lines = content.split('\n');
   const cleanedLines = lines.map(line => line.trim()).filter((line, i, arr) => {
