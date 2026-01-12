@@ -71,6 +71,9 @@ function cleanPoemContent(content) {
   content = content.replace(/\r\n/g, '\n');
   content = content.replace(/\r/g, '\n');
 
+  // Convert multiple spaces (2+) to line breaks - some data uses spaces instead of newlines
+  content = content.replace(/  +/g, '\n');
+
   // Preserve stanza breaks (double newlines) by using a placeholder
   content = content.replace(/\n\n+/g, '\n\n§STANZA§\n\n');
 
