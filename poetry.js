@@ -66,76 +66,39 @@ async function init() {
 function cleanPoemContent(content) {
   if (!content) return '';
 
-  // Normalize line breaks
+  // Fix encoding issues - garbled UTF-8 smart quotes and dashes
+  // These patterns occur when UTF-8 is misinterpreted
+  content = content.replace(/â€™/g, "'");      // right single quote
+  content = content.replace(/â€˜/g, "'");      // left single quote
+  content = content.replace(/â€œ/g, '"');      // left double quote
+  content = content.replace(/â€/g, '"');       // right double quote (partial)
+  content = content.replace(/â€"/g, '—');      // em-dash
+  content = content.replace(/â€"/g, '–');      // en-dash
+  content = content.replace(/â€¦/g, '...');    // ellipsis
+  content = content.replace(/â€˜/g, "'");      // another single quote variant
+  content = content.replace(/Ã¢â‚¬â„¢/g, "'"); // deeply garbled apostrophe
+  content = content.replace(/Ã¢â‚¬/g, '"');    // deeply garbled quote
+  // Clean up any remaining garbled sequences (â followed by box characters)
+  content = content.replace(/â[\u0080-\u00FF][\u0080-\u00FF]/g, "'");
+  content = content.replace(/â\s*□\s*□/g, "'");
+
+  // Normalize line breaks - handle \r\r\n pattern in the data
+  content = content.replace(/\r\r\n/g, '\n');
   content = content.replace(/\r\n/g, '\n');
   content = content.replace(/\r/g, '\n');
 
-  // Convert multiple spaces (2+) to line breaks - some data uses spaces instead of newlines
-  content = content.replace(/  +/g, '\n');
-
-  // Preserve stanza breaks (double newlines) by using a placeholder
-  content = content.replace(/\n\n+/g, '\n\n§STANZA§\n\n');
-
-  // Split into lines
+  // Trim leading/trailing whitespace from each line but preserve line structure
   const lines = content.split('\n');
-  const result = [];
-  let currentLine = '';
+  const cleanedLines = lines.map(line => line.trim()).filter((line, i, arr) => {
+    // Keep the line if it has content, or if it's an empty line between content (stanza break)
+    if (line) return true;
+    // Keep empty lines that are between content lines (stanza breaks)
+    const prevHasContent = arr.slice(0, i).some(l => l);
+    const nextHasContent = arr.slice(i + 1).some(l => l);
+    return prevHasContent && nextHasContent;
+  });
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    // Skip empty lines (stanza breaks handled separately)
-    if (!line) continue;
-
-    // Handle stanza marker - output accumulated line first
-    if (line === '§STANZA§') {
-      if (currentLine) {
-        result.push(currentLine);
-        currentLine = '';
-      }
-      result.push('');
-      continue;
-    }
-
-    // If no accumulated line, start fresh
-    if (!currentLine) {
-      currentLine = line;
-      continue;
-    }
-
-    // Check if current accumulated line was probably hard-wrapped
-    const endsWithLowercase = /[a-z]$/.test(currentLine);
-    const startsWithLowercase = /^[a-z]/.test(line);
-    const endsWithPunctuation = /[.!?,;:'")\-—]$/.test(currentLine);
-
-    if (endsWithLowercase && startsWithLowercase && !endsWithPunctuation) {
-      // Determine if this was mid-word split or word boundary
-      // Get the last "word fragment" (text after last space)
-      const lastSpaceIdx = currentLine.lastIndexOf(' ');
-      const tailFragment = lastSpaceIdx >= 0 ? currentLine.slice(lastSpaceIdx + 1) : currentLine;
-
-      // If tail is very short (1-3 chars), it's likely a mid-word split
-      // Join without space to reconstruct the word
-      if (tailFragment.length <= 3) {
-        currentLine = currentLine + line;
-      } else {
-        // Tail is longer, likely a complete word - add space between
-        currentLine = currentLine + ' ' + line;
-      }
-    } else {
-      // This looks like a natural line break, save current line and start new one
-      result.push(currentLine);
-      currentLine = line;
-    }
-  }
-
-  // Don't forget the last line
-  if (currentLine) {
-    result.push(currentLine);
-  }
-
-  // Join lines back together
-  return result.join('\n');
+  return cleanedLines.join('\n');
 }
 
 // Load poems from local JSON file
