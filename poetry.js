@@ -5,9 +5,9 @@ const ALBUMS_KEY = 'poetry_albums';
 const BACKUP_KEY = 'poetry_backup_info';
 const BACKUP_REMINDER_THRESHOLD = 50;
 
-// Local poetry data (7,377 poems from Poetry Foundation)
+// Local poetry data (13,801 poems from Poetry Foundation)
 const POEMS_DATA_URL = 'poems-data.json';
-const TOTAL_POEMS = 7377;
+const TOTAL_POEMS = 13801;
 
 let poems = [];
 let poemsMap = {};
