@@ -341,19 +341,50 @@ html, body {
 /* Close button (×) - diffuse light style */
 .icon-btn.small:not(.glow-icon) {
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4),
-               0 0 15px rgba(255, 255, 255, 0.2);
-  font-weight: 300;
-  font-size: 24px;
+  border: none;
+  color: transparent;
+  position: relative;
+  overflow: visible;
+}
+
+.icon-btn.small:not(.glow-icon)::before {
+  content: '×';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+  font-weight: 200;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    rgba(255, 255, 255, 0.1) 70%,
+    transparent 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: blur(0.3px);
+  transition: all 0.4s ease;
 }
 
 .icon-btn.small:not(.glow-icon):hover {
   background: transparent;
   box-shadow: none;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.6),
-               0 0 25px rgba(255, 255, 255, 0.4);
+}
+
+.icon-btn.small:not(.glow-icon):hover::before {
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.7) 40%,
+    rgba(255, 255, 255, 0.3) 70%,
+    transparent 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
 }
 
 /* Button positions */
@@ -551,28 +582,24 @@ html, body {
   position: absolute;
   bottom: 140px;
   right: 16px;
-  background: rgba(20, 20, 22, 0.95);
-  border-radius: 8px;
-  padding: 20px;
+  background: rgba(15, 15, 17, 0.92);
+  border-radius: 10px;
+  padding: 16px 18px;
   z-index: 20;
-  min-width: 220px;
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  min-width: 180px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .panel-header h3 {
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 1px;
-  color: #aaa;
-  filter: blur(0.3px);
+  display: none;
 }
 
 #album-checkboxes label {
@@ -602,80 +629,124 @@ html, body {
   margin-right: 14px;
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: none;
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
   position: relative;
   transition: all 0.4s ease;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
-#album-checkboxes input[type="checkbox"]:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+/* Outer diffuse ring */
+#album-checkboxes input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    transparent 0%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 60%,
+    rgba(255, 255, 255, 0.3) 70%,
+    rgba(255, 255, 255, 0.15) 80%,
+    transparent 100%
+  );
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+  transition: all 0.4s ease;
 }
 
-#album-checkboxes input[type="checkbox"]:checked {
-  border-color: rgba(255, 255, 255, 0.8);
+/* Inner fill (starts invisible) */
+#album-checkboxes input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+  border-radius: 50%;
   background: radial-gradient(
     circle,
     rgba(255, 255, 255, 0.9) 0%,
-    rgba(255, 255, 255, 0.5) 40%,
-    rgba(255, 255, 255, 0.2) 70%,
+    rgba(255, 255, 255, 0.6) 40%,
+    rgba(255, 255, 255, 0.3) 70%,
     transparent 100%
   );
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.5),
-              0 0 30px rgba(255, 255, 255, 0.2);
-  animation: checkbox-glow 0.6s ease-out;
+  transition: width 2s ease-out, height 2s ease-out, box-shadow 2s ease-out;
 }
 
-@keyframes checkbox-glow {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
-  }
-  50% {
-    transform: scale(1.2);
-    box-shadow: 0 0 25px rgba(255, 255, 255, 0.8),
-                0 0 50px rgba(255, 255, 255, 0.4);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5),
-                0 0 30px rgba(255, 255, 255, 0.2);
-  }
+#album-checkboxes input[type="checkbox"]:hover::before {
+  background: radial-gradient(
+    circle,
+    transparent 0%,
+    transparent 45%,
+    rgba(255, 255, 255, 0.25) 55%,
+    rgba(255, 255, 255, 0.5) 70%,
+    rgba(255, 255, 255, 0.25) 85%,
+    transparent 100%
+  );
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
 }
 
-/* Note input in save panel */
+#album-checkboxes input[type="checkbox"]:checked::before {
+  background: radial-gradient(
+    circle,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.3) 55%,
+    rgba(255, 255, 255, 0.6) 70%,
+    rgba(255, 255, 255, 0.3) 85%,
+    transparent 100%
+  );
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.35);
+}
+
+#album-checkboxes input[type="checkbox"]:checked::after {
+  width: 14px;
+  height: 14px;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+}
+
+/* Note input in save panel - always visible, minimal */
 #note-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 #note-input {
   width: 100%;
-  min-height: 70px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 12px 14px;
-  color: #ddd;
-  font-size: 13px;
+  height: 40px;
+  min-height: 40px;
+  max-height: 80px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  padding: 8px 0;
+  color: #aaa;
+  font-size: 12px;
   font-family: inherit;
-  resize: vertical;
-  transition: all 0.3s ease;
+  resize: none;
+  transition: all 0.4s ease;
+  overflow: hidden;
 }
 
 #note-input:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+  color: #ccc;
 }
 
 #note-input::placeholder {
-  color: #555;
+  color: #444;
+  font-style: italic;
 }
 
 /* =============================================
