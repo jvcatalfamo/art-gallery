@@ -1,3 +1,7 @@
+/* =============================================
+   MOUNT CARMEL AESTHETIC - Art Gallery Styles
+   ============================================= */
+
 * {
   margin: 0;
   padding: 0;
@@ -7,16 +11,144 @@
 html, body {
   height: 100%;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #000;
-  color: #fff;
+  font-family: "Times New Roman", Georgia, serif;
+  background: #0b0b0c;
+  color: #f5f5f5;
 }
 
 .hidden {
   display: none !important;
 }
 
-/* Views */
+/* =============================================
+   HOME PAGE - Orb Navigation
+   ============================================= */
+
+.home-view {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #0b0b0c;
+}
+
+.home-orbs {
+  display: flex;
+  gap: 80px;
+  align-items: center;
+  justify-content: center;
+}
+
+.orb-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.5s ease;
+}
+
+.orb-link:hover {
+  transform: scale(1.05);
+}
+
+.orb-link.coming-soon {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.orb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orb-core {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.6) 30%,
+    rgba(255, 255, 255, 0.2) 60%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  filter: blur(1px);
+  animation: pulse-core 3s infinite ease-in-out;
+}
+
+.orb-glow {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 40%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  filter: blur(8px);
+  animation: pulse-glow 3s infinite ease-in-out;
+  animation-delay: 0.2s;
+}
+
+.orb-link:hover .orb-core {
+  animation: pulse-core-hover 2s infinite ease-in-out;
+}
+
+.orb-link:hover .orb-glow {
+  animation: pulse-glow-hover 2s infinite ease-in-out;
+}
+
+@keyframes pulse-core {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+@keyframes pulse-core-hover {
+  0%, 100% { transform: scale(1.1); opacity: 0.9; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+@keyframes pulse-glow-hover {
+  0%, 100% { transform: scale(1.2); opacity: 0.7; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+
+.orb-label {
+  font-size: 14px;
+  color: #ccc;
+  letter-spacing: 3px;
+  text-transform: lowercase;
+  filter: blur(0.4px);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  transition: all 0.5s ease;
+}
+
+.orb-link:hover .orb-label {
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+}
+
+/* =============================================
+   VIEWS - General Structure
+   ============================================= */
+
 .view {
   display: none;
   height: 100%;
@@ -28,9 +160,13 @@ html, body {
   flex-direction: column;
 }
 
-/* Gallery View */
+/* =============================================
+   GALLERY VIEW
+   ============================================= */
+
 #gallery, #album-detail {
   position: relative;
+  background: #0b0b0c;
 }
 
 #artwork-container, #album-artwork-container {
@@ -39,7 +175,7 @@ html, body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #111;
+  background: #0b0b0c;
 }
 
 #artwork, #album-artwork {
@@ -47,91 +183,110 @@ html, body {
   max-height: 100%;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.8s ease;
+  cursor: zoom-in;
 }
 
 #artwork.loaded, #album-artwork.loaded {
   opacity: 1;
 }
 
-#artwork, #album-artwork {
-  cursor: zoom-in;
-  transition: transform 0.2s ease, opacity 0.3s ease;
-}
-
-#artwork-container, #album-artwork-container {
-  overflow: hidden;
-}
-
 #loading, #album-loading {
   position: absolute;
-  color: #666;
-  font-size: 14px;
+  color: #555;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: lowercase;
+  filter: blur(0.3px);
 }
 
-/* Info bar */
+/* =============================================
+   INFO BAR
+   ============================================= */
+
 #info, #album-info {
-  padding: 16px 20px;
-  background: #000;
+  padding: 20px 24px;
+  background: #0b0b0c;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: 10px 20px;
   align-items: baseline;
-  min-height: 60px;
+  min-height: 70px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #title, #album-art-title {
-  font-weight: 500;
-  font-size: 16px;
-  color: #fff;
+  font-weight: 400;
+  font-size: 15px;
+  color: #ddd;
+  filter: blur(0.3px);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.2);
 }
 
 #artist, #album-art-artist {
-  font-size: 14px;
-  color: #aaa;
+  font-size: 13px;
+  color: #888;
+  filter: blur(0.3px);
 }
 
 #year, #album-art-year {
-  font-size: 14px;
-  color: #666;
+  font-size: 13px;
+  color: #555;
+  filter: blur(0.3px);
 }
 
-/* Style tag in info */
 #style {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
-  background: #222;
-  padding: 2px 8px;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 3px 10px;
+  border-radius: 12px;
+  filter: blur(0.2px);
 }
 
 #style:empty {
   display: none;
 }
 
-/* Icon buttons */
+/* =============================================
+   ICON BUTTONS - Glowing Orb Style
+   ============================================= */
+
 .icon-btn {
-  background: rgba(255, 255, 255, 0.1);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 70%
+  );
   border: none;
   border-radius: 50%;
   width: 44px;
   height: 44px;
   cursor: pointer;
-  color: #fff;
+  color: #aaa;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all 0.4s ease;
+  filter: blur(0.3px);
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.25) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.15);
 }
 
 .icon-btn.small {
   width: 32px;
   height: 32px;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 /* Button positions */
@@ -147,57 +302,104 @@ html, body {
   left: 16px;
 }
 
+#home-btn {
+  position: absolute;
+  top: 16px;
+  left: 70px;
+}
+
 .save-btn {
   position: absolute;
   bottom: 80px;
   right: 16px;
-  background: rgba(74, 158, 255, 0.8);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
 }
 
 .save-btn:hover {
-  background: rgba(74, 158, 255, 1);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 70%
+  );
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.25);
 }
 
 .remove-btn {
   position: absolute;
   bottom: 80px;
   right: 16px;
-  background: rgba(255, 100, 100, 0.8);
+  background: radial-gradient(
+    circle,
+    rgba(255, 150, 150, 0.3) 0%,
+    rgba(255, 150, 150, 0.1) 50%,
+    transparent 70%
+  );
+  color: #ffaaaa;
 }
 
 .remove-btn:hover {
-  background: rgba(255, 100, 100, 1);
+  background: radial-gradient(
+    circle,
+    rgba(255, 150, 150, 0.5) 0%,
+    rgba(255, 150, 150, 0.2) 50%,
+    transparent 70%
+  );
+  box-shadow: 0 0 20px rgba(255, 150, 150, 0.2);
+  color: #ffcccc;
 }
 
-/* AI button */
+/* =============================================
+   AI BUTTON
+   ============================================= */
+
 #ai-btn {
   position: absolute;
   bottom: 80px;
   left: 16px;
-  background: rgba(255, 255, 255, 0.15);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 70%
+  );
   border: none;
   border-radius: 50%;
   width: 40px;
   height: 40px;
   cursor: pointer;
-  color: #ccc;
+  color: #888;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.4s ease;
 }
 
 #ai-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  color: #fff;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 70%
+  );
+  color: #ccc;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
 #ai-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: wait;
 }
 
-/* AI Modal */
+/* =============================================
+   AI MODAL
+   ============================================= */
+
 .ai-modal-content {
   max-height: 70vh;
 }
@@ -205,7 +407,7 @@ html, body {
 #ai-response {
   max-height: 50vh;
   overflow-y: auto;
-  line-height: 1.6;
+  line-height: 1.8;
 }
 
 #ai-loading {
@@ -213,90 +415,57 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 30px;
-  gap: 20px;
+  padding: 40px;
+  gap: 24px;
 }
 
 .breathing-orb {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.9) 0%, transparent 50%),
-    radial-gradient(circle at 70% 60%, rgba(255,255,255,0.7) 0%, transparent 40%),
-    radial-gradient(circle at 40% 70%, rgba(200,220,255,0.8) 0%, transparent 45%),
-    radial-gradient(circle at 60% 30%, rgba(180,200,240,0.6) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, #c8deff 0%, #8badd9 50%, #5a80b8 100%);
-  box-shadow:
-    0 0 30px rgba(200, 222, 255, 0.5),
-    inset 0 0 20px rgba(255,255,255,0.3);
-  animation: breathe 6s ease-in-out infinite;
-  position: relative;
-}
-
-.breathing-orb::before {
-  content: '';
-  position: absolute;
-  top: 10%;
-  left: 15%;
-  width: 30%;
-  height: 20%;
-  background: rgba(255,255,255,0.6);
-  border-radius: 50%;
-  filter: blur(3px);
-}
-
-.breathing-orb::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 25% 35%, rgba(255,255,255,0.4) 0%, transparent 30%),
-    radial-gradient(circle at 65% 55%, rgba(255,255,255,0.3) 0%, transparent 25%);
-  animation: swirl 8s linear infinite;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.4) 30%,
+    rgba(255, 255, 255, 0.1) 60%,
+    transparent 100%
+  );
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+  animation: breathe 4s ease-in-out infinite;
+  filter: blur(2px);
 }
 
 @keyframes breathe {
   0%, 100% {
     transform: scale(1);
-    box-shadow:
-      0 0 25px rgba(200, 222, 255, 0.4),
-      inset 0 0 15px rgba(255,255,255,0.2);
+    opacity: 0.6;
   }
   50% {
-    transform: scale(1.2);
-    box-shadow:
-      0 0 50px rgba(200, 222, 255, 0.6),
-      inset 0 0 25px rgba(255,255,255,0.4);
+    transform: scale(1.3);
+    opacity: 1;
   }
-}
-
-@keyframes swirl {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 .breath-text {
-  font-size: 14px;
-  color: #8badd9;
-  letter-spacing: 2px;
+  font-size: 12px;
+  color: #888;
+  letter-spacing: 3px;
   text-transform: lowercase;
-  animation: fadeText 6s ease-in-out infinite;
+  animation: fadeText 4s ease-in-out infinite;
+  filter: blur(0.3px);
 }
 
 @keyframes fadeText {
-  0%, 100% { opacity: 0.6; }
+  0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
 
 #ai-text {
-  font-size: 15px;
-  color: #ddd;
+  font-size: 14px;
+  color: #ccc;
   white-space: pre-wrap;
+  line-height: 1.8;
+  filter: blur(0.2px);
 }
 
 #ai-text:empty {
@@ -307,37 +476,51 @@ html, body {
   display: none;
 }
 
-/* Save panel */
+/* =============================================
+   SAVE PANEL
+   ============================================= */
+
 #save-panel {
   position: absolute;
   bottom: 140px;
   right: 16px;
-  background: #222;
-  border-radius: 12px;
-  padding: 16px;
+  background: rgba(20, 20, 22, 0.95);
+  border-radius: 8px;
+  padding: 20px;
   z-index: 20;
-  min-width: 200px;
+  min-width: 220px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .panel-header h3 {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #aaa;
+  filter: blur(0.3px);
 }
 
 #album-checkboxes label {
   display: flex;
   align-items: center;
-  padding: 10px 0;
+  padding: 12px 0;
   font-size: 14px;
   cursor: pointer;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #ccc;
+  transition: color 0.3s ease;
+}
+
+#album-checkboxes label:hover {
+  color: #fff;
 }
 
 #album-checkboxes label:last-child {
@@ -345,113 +528,145 @@ html, body {
 }
 
 #album-checkboxes input[type="checkbox"] {
-  margin-right: 12px;
-  width: 18px;
-  height: 18px;
+  margin-right: 14px;
+  width: 16px;
+  height: 16px;
+  accent-color: #888;
 }
 
 /* Note input in save panel */
 #note-section {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #333;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #note-input {
   width: 100%;
-  min-height: 60px;
-  background: #333;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: #fff;
+  min-height: 70px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: #ddd;
   font-size: 13px;
   font-family: inherit;
   resize: vertical;
+  transition: all 0.3s ease;
 }
 
 #note-input:focus {
-  outline: 2px solid #4a9eff;
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
 }
 
 #note-input::placeholder {
-  color: #666;
+  color: #555;
 }
 
-/* Complete/empty messages */
+/* =============================================
+   COMPLETE/EMPTY MESSAGES
+   ============================================= */
+
 #complete-msg, #album-empty {
   position: absolute;
   text-align: center;
-  color: #888;
+  color: #666;
 }
 
 #complete-msg p, #album-empty p {
-  margin-bottom: 16px;
-  font-size: 18px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  letter-spacing: 1px;
+  filter: blur(0.3px);
 }
 
 #reset-btn {
-  background: #4a9eff;
-  color: #fff;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 80%
+  );
+  color: #ccc;
   border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 14px 28px;
+  border-radius: 25px;
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.4s ease;
 }
 
 #reset-btn:hover {
-  background: #3a8eef;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 80%
+  );
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
 }
 
-/* Albums View */
+/* =============================================
+   ALBUMS VIEW
+   ============================================= */
+
 #albums {
-  background: #111;
+  background: #0b0b0c;
 }
 
 #albums-header, #album-detail-header {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid #333;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #albums-header h1, #album-detail-header h1 {
   flex: 1;
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: #ccc;
+  filter: blur(0.3px);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
 }
 
 #album-detail-count {
-  font-size: 14px;
-  color: #666;
+  font-size: 12px;
+  color: #555;
+  letter-spacing: 1px;
 }
 
 #albums-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 12px 0;
 }
 
 .album-item {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
+  padding: 18px 24px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
 }
 
 .album-item:hover {
-  background: #222;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .album-item .album-icon {
   width: 48px;
   height: 48px;
-  background: #333;
-  border-radius: 8px;
-  margin-right: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  margin-right: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -469,19 +684,25 @@ html, body {
 }
 
 .album-item .album-name {
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 400;
+  margin-bottom: 6px;
+  color: #ccc;
+  filter: blur(0.3px);
 }
 
 .album-item .album-count {
-  font-size: 12px;
-  color: #888;
+  font-size: 11px;
+  color: #555;
+  letter-spacing: 1px;
 }
 
-/* Album Detail View */
+/* =============================================
+   ALBUM DETAIL VIEW
+   ============================================= */
+
 #album-detail {
-  background: #000;
+  background: #0b0b0c;
 }
 
 /* Note display in album detail */
@@ -490,28 +711,30 @@ html, body {
   bottom: 140px;
   left: 16px;
   right: 70px;
-  background: rgba(30, 30, 30, 0.95);
-  border-radius: 10px;
-  padding: 12px 14px;
+  background: rgba(20, 20, 22, 0.95);
+  border-radius: 8px;
+  padding: 14px 16px;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #album-note-display {
   flex: 1;
   font-size: 13px;
-  color: #ccc;
-  line-height: 1.5;
+  color: #aaa;
+  line-height: 1.6;
   max-height: 80px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  filter: blur(0.2px);
 }
 
 #edit-note-btn {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Add note button */
@@ -519,34 +742,37 @@ html, body {
   position: absolute;
   bottom: 140px;
   left: 16px;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .note-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* Edit note modal */
 #edit-note-input {
   width: 100%;
-  min-height: 100px;
-  background: #333;
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  color: #fff;
+  min-height: 120px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 14px;
+  color: #ddd;
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  line-height: 1.6;
 }
 
 #edit-note-input:focus {
-  outline: 2px solid #4a9eff;
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
 }
 
 #edit-note-input::placeholder {
-  color: #666;
+  color: #555;
 }
 
 .note-modal-buttons {
@@ -554,14 +780,17 @@ html, body {
   gap: 12px;
 }
 
-/* Edit Albums Modal */
+/* =============================================
+   MODALS
+   ============================================= */
+
 .modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -569,127 +798,165 @@ html, body {
 }
 
 .modal-content {
-  background: #222;
-  border-radius: 12px;
-  padding: 20px;
+  background: rgba(20, 20, 22, 0.98);
+  border-radius: 10px;
+  padding: 24px;
   width: 90%;
   max-width: 400px;
   max-height: 80vh;
   overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .modal-header h2 {
-  font-size: 18px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #ccc;
+  filter: blur(0.3px);
 }
 
 #edit-albums-list {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .edit-album-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #333;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .edit-album-row input[type="text"] {
   flex: 1;
-  background: #333;
-  border: none;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  padding: 10px 12px;
-  color: #fff;
+  padding: 12px 14px;
+  color: #ddd;
   font-size: 14px;
+  font-family: inherit;
 }
 
 .edit-album-row input[type="text"]:focus {
-  outline: 2px solid #4a9eff;
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .delete-album-btn {
   background: transparent;
   border: none;
-  color: #ff6666;
+  color: #aa6666;
   cursor: pointer;
   padding: 8px;
-  font-size: 18px;
+  font-size: 16px;
+  transition: color 0.3s ease;
+}
+
+.delete-album-btn:hover {
+  color: #cc8888;
 }
 
 .text-btn {
   background: transparent;
-  border: 1px solid #4a9eff;
-  color: #4a9eff;
-  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #aaa;
+  padding: 12px 18px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
   width: 100%;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
 }
 
 .text-btn:hover {
-  background: rgba(74, 158, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.03);
 }
 
-/* Backup section */
+/* =============================================
+   BACKUP SECTION
+   ============================================= */
+
 .backup-buttons {
   display: flex;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
 .action-btn {
   flex: 1;
-  background: #4a9eff;
-  color: #fff;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.05) 70%,
+    transparent 100%
+  );
+  color: #ccc;
   border: none;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 14px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
-  transition: background 0.2s;
+  letter-spacing: 1px;
+  transition: all 0.4s ease;
 }
 
 .action-btn:hover {
-  background: #3a8eef;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.08) 70%,
+    transparent 100%
+  );
+  color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
 .action-btn.secondary {
-  background: #333;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .action-btn.secondary:hover {
-  background: #444;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 #last-backup-text {
-  font-size: 13px;
-  color: #888;
+  font-size: 12px;
+  color: #555;
+  letter-spacing: 1px;
 }
 
 #backup-reminder .modal-content p {
-  color: #aaa;
-  margin-bottom: 16px;
-  line-height: 1.5;
+  color: #888;
+  margin-bottom: 20px;
+  line-height: 1.7;
 }
 
 #backup-reminder #reminder-count {
-  color: #4a9eff;
-  font-weight: 600;
+  color: #ccc;
+  font-weight: 400;
 }
 
-/* Stats View */
+/* =============================================
+   STATS VIEW
+   ============================================= */
+
 #stats {
-  background: #111;
+  background: #0b0b0c;
   flex-direction: column;
 }
 
@@ -697,66 +964,76 @@ html, body {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid #333;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 #stats-header h1 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: #ccc;
+  filter: blur(0.3px);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
 }
 
 #stats-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
 }
 
 .stat-section {
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 
 .stat-section h2 {
-  font-size: 14px;
-  font-weight: 500;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #555;
+  text-transform: lowercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
 }
 
 /* Progress bars */
 .progress-bar {
-  height: 8px;
-  background: #333;
-  border-radius: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .progress-fill {
   height: 100%;
-  background: #4a9eff;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  border-radius: 2px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
 }
 
 #overall-text {
-  font-size: 14px;
-  color: #aaa;
+  font-size: 13px;
+  color: #666;
+  letter-spacing: 1px;
 }
 
 /* Style/Artist lists */
 #style-list, #artist-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .artist-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .artist-row .artist-info {
@@ -766,114 +1043,28 @@ html, body {
 }
 
 .artist-row .artist-name {
-  font-size: 14px;
-  color: #fff;
+  font-size: 13px;
+  color: #aaa;
+  filter: blur(0.2px);
 }
 
 .artist-row .artist-count {
-  font-size: 12px;
-  color: #666;
+  font-size: 11px;
+  color: #555;
+  letter-spacing: 1px;
 }
 
 .artist-row .progress-bar {
-  height: 6px;
+  height: 3px;
 }
 
-/* Touch feedback */
-#gallery, #album-detail {
-  touch-action: pan-x;
-  user-select: none;
-}
+/* =============================================
+   POETRY VIEW
+   ============================================= */
 
-/* Home button position */
-#home-btn {
-  position: absolute;
-  top: 16px;
-  left: 70px;
-}
-
-/* Home Page */
-.home-view {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  background: #000;
-}
-
-.home-title {
-  font-size: 48px;
-  font-weight: 300;
-  letter-spacing: 4px;
-  margin-bottom: 12px;
-  color: #fff;
-}
-
-.home-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin-bottom: 60px;
-}
-
-.home-cards {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 800px;
-}
-
-.home-card {
-  background: #111;
-  border: 1px solid #222;
-  border-radius: 16px;
-  padding: 40px 32px;
-  width: 220px;
-  text-align: center;
-  text-decoration: none;
-  color: #fff;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.home-card:hover {
-  background: #1a1a1a;
-  border-color: #333;
-  transform: translateY(-4px);
-}
-
-.home-card.coming-soon {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.home-card.coming-soon:hover {
-  transform: none;
-  background: #111;
-  border-color: #222;
-}
-
-.card-icon {
-  margin-bottom: 20px;
-  color: #4a9eff;
-}
-
-.home-card h2 {
-  font-size: 24px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.home-card p {
-  font-size: 14px;
-  color: #888;
-}
-
-/* Poetry View */
 #poetry {
   position: relative;
+  background: #0b0b0c;
 }
 
 #poem-container {
@@ -883,24 +1074,28 @@ html, body {
   align-items: center;
   justify-content: flex-start;
   overflow-y: auto;
-  padding: 70px 20px 100px;
-  background: #111;
+  padding: 80px 24px 120px;
+  background: #0b0b0c;
 }
 
 #poem-text {
   max-width: 600px;
   width: 100%;
-  font-size: 18px;
-  line-height: 1.8;
-  color: #ddd;
+  font-size: 17px;
+  line-height: 2;
+  color: #ccc;
   white-space: pre-wrap;
   text-align: center;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: "Times New Roman", Georgia, serif;
+  filter: blur(0.2px);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
 }
 
 #poem-loading {
-  color: #666;
-  font-size: 14px;
+  color: #555;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: lowercase;
 }
 
 /* Poetry album/collection detail */
@@ -911,52 +1106,83 @@ html, body {
   align-items: center;
   justify-content: flex-start;
   overflow-y: auto;
-  padding: 20px 20px 100px;
-  background: #111;
+  padding: 24px 24px 120px;
+  background: #0b0b0c;
 }
 
 #album-poem-text {
   max-width: 600px;
   width: 100%;
-  font-size: 18px;
-  line-height: 1.8;
-  color: #ddd;
+  font-size: 17px;
+  line-height: 2;
+  color: #ccc;
   white-space: pre-wrap;
   text-align: center;
-  font-family: Georgia, 'Times New Roman', serif;
-  padding-top: 20px;
+  font-family: "Times New Roman", Georgia, serif;
+  padding-top: 24px;
+  filter: blur(0.2px);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
 }
 
-/* Responsive */
+/* =============================================
+   TOUCH FEEDBACK
+   ============================================= */
+
+#gallery, #album-detail {
+  touch-action: pan-x;
+  user-select: none;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+
+@media (max-width: 600px) {
+  .home-orbs {
+    gap: 50px;
+  }
+
+  .orb {
+    width: 60px;
+    height: 60px;
+  }
+
+  .orb-core {
+    width: 18px;
+    height: 18px;
+  }
+
+  .orb-glow {
+    width: 45px;
+    height: 45px;
+  }
+
+  .orb-label {
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+}
+
 @media (max-width: 480px) {
+  .home-orbs {
+    flex-direction: column;
+    gap: 60px;
+  }
+
   #info, #album-info {
-    padding: 12px 16px;
+    padding: 16px 18px;
   }
 
   #title, #album-art-title {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   #artist, #year, #album-art-artist, #album-art-year {
-    font-size: 12px;
+    font-size: 11px;
   }
 
-  .home-title {
-    font-size: 36px;
-  }
-
-  .home-cards {
-    gap: 16px;
-  }
-
-  .home-card {
-    width: 100%;
-    max-width: 280px;
-    padding: 32px 24px;
-  }
-
-  #poem-text {
-    font-size: 16px;
-    padding: 0 10px;
+  #poem-text, #album-poem-text {
+    font-size: 15px;
+    padding: 0 12px;
   }
 }
