@@ -968,6 +968,13 @@ function hideBackupReminder() {
   document.getElementById('backup-reminder').classList.add('hidden');
 }
 
+function snoozeBackupReminder() {
+  // Snooze - set counter so reminder won't appear for another ~25 artworks
+  backupInfo.seenAtLastBackup = seen.size - Math.floor(BACKUP_REMINDER_THRESHOLD / 2);
+  saveBackupInfo();
+  hideBackupReminder();
+}
+
 function exportData() {
   const data = {
     version: 1,
