@@ -315,16 +315,16 @@
   </div>
 
   <!-- Backup Reminder Modal -->
-  <div id="backup-reminder" class="modal hidden">
+  <div id="backup-reminder" class="modal hidden" onclick="if(event.target===this)hideBackupReminder()">
     <div class="modal-content">
       <div class="modal-header">
         <h2>Time to Backup!</h2>
-        <button id="close-backup-reminder" class="icon-btn small">×</button>
+        <button id="close-backup-reminder" class="icon-btn small" onclick="hideBackupReminder()">×</button>
       </div>
       <p>You've seen <span id="reminder-count">0</span> new artworks since your last backup. Export your data to keep it safe!</p>
       <div class="backup-buttons">
-        <button id="reminder-export-btn" class="action-btn">Export Now</button>
-        <button id="reminder-later-btn" class="action-btn secondary">Remind Me Later</button>
+        <button id="reminder-export-btn" class="action-btn" onclick="exportData()">Export Now</button>
+        <button id="reminder-later-btn" class="action-btn secondary" onclick="hideBackupReminder()">Remind Me Later</button>
       </div>
     </div>
   </div>
