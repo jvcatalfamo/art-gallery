@@ -421,13 +421,19 @@ function setupControls() {
     }
   });
 
-  // Close panels on outside click - use capture phase to run before navigation handlers
-  document.addEventListener('click', (e) => {
-    if (!savePanel.classList.contains('hidden') && !savePanel.contains(e.target) && e.target !== saveBtn && !saveBtn.contains(e.target)) {
+  // Close panels on outside click/touch - use capture phase to run before navigation handlers
+  function closeSavePanelOnOutsideInteraction(e) {
+    const target = e.target || (e.changedTouches && document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY));
+    if (!savePanel.classList.contains('hidden') && !savePanel.contains(target) && target !== saveBtn && !saveBtn.contains(target)) {
       savePanel.classList.add('hidden');
-      e.stopPropagation(); // Prevent click from triggering navigation
+      e.stopPropagation(); // Prevent from triggering navigation
+      if (e.type === 'touchend') {
+        e.preventDefault(); // Also prevent click event on mobile
+      }
     }
-  }, true); // Use capture phase
+  }
+  document.addEventListener('click', closeSavePanelOnOutsideInteraction, true);
+  document.addEventListener('touchend', closeSavePanelOnOutsideInteraction, true);
 
   // Reset
   resetBtn.addEventListener('click', () => {
