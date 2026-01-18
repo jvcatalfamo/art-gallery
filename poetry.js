@@ -47,7 +47,6 @@ const backBtn = document.getElementById('back-btn');
 const albumsBtn = document.getElementById('albums-btn');
 const saveBtn = document.getElementById('save-btn');
 const savePanel = document.getElementById('save-panel');
-const closeSavePanel = document.getElementById('close-save-panel');
 const albumCheckboxes = document.getElementById('album-checkboxes');
 
 // Initialize
@@ -325,16 +324,13 @@ function setupControls() {
     }
   });
 
-  closeSavePanel.addEventListener('click', () => {
-    savePanel.classList.add('hidden');
-  });
-
-  // Close panels on outside click
+  // Close panels on outside click - use capture phase to run before navigation handlers
   document.addEventListener('click', (e) => {
-    if (!savePanel.contains(e.target) && e.target !== saveBtn) {
+    if (!savePanel.classList.contains('hidden') && !savePanel.contains(e.target) && e.target !== saveBtn && !saveBtn.contains(e.target)) {
       savePanel.classList.add('hidden');
+      e.stopPropagation(); // Prevent click from triggering navigation
     }
-  });
+  }, true); // Use capture phase
 
   // Edit collections
   document.getElementById('edit-albums-btn').addEventListener('click', showEditAlbumsModal);
