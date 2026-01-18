@@ -423,7 +423,15 @@ function setupControls() {
 
   // Close panels on outside click/touch - use capture phase to run before navigation handlers
   function closeSavePanelOnOutsideInteraction(e) {
-    const target = e.target || (e.changedTouches && document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY));
+    // For touch events, get element at touch point (more accurate than e.target)
+    let target = e.target;
+    if (e.type === 'touchend' && e.changedTouches && e.changedTouches[0]) {
+      target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY) || target;
+    }
+
+    // Don't interfere with modals or their contents
+    if (target && target.closest('.modal')) return;
+
     if (!savePanel.classList.contains('hidden') && !savePanel.contains(target) && target !== saveBtn && !saveBtn.contains(target)) {
       savePanel.classList.add('hidden');
       e.stopPropagation(); // Prevent from triggering navigation
