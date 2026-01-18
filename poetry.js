@@ -324,24 +324,27 @@ function setupControls() {
     }
   });
 
-  // Close panels on outside click/touch - use capture phase to run before navigation handlers
+  // Close save panel on outside click/touch
   function closeSavePanelOnOutsideInteraction(e) {
-    // For touch events, get element at touch point (more accurate than e.target)
+    // Only act if save panel is actually visible
+    if (savePanel.classList.contains('hidden')) return;
+
+    // Get the actual target element
     let target = e.target;
     if (e.type === 'touchend' && e.changedTouches && e.changedTouches[0]) {
       target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY) || target;
     }
 
-    // Don't interfere with modals or their contents
-    if (target && target.closest('.modal')) return;
+    // Don't interfere with modals, dialogs, or any overlay content
+    if (!target) return;
+    if (target.closest('.modal')) return;
+    if (target.closest('#save-panel')) return;
+    if (target.closest('.icon-btn')) return;
 
-    if (!savePanel.classList.contains('hidden') && !savePanel.contains(target) && target !== saveBtn && !saveBtn.contains(target)) {
-      savePanel.classList.add('hidden');
-      e.stopPropagation(); // Prevent from triggering navigation
-      if (e.type === 'touchend') {
-        e.preventDefault(); // Also prevent click event on mobile
-      }
-    }
+    // Close the save panel and prevent navigation
+    savePanel.classList.add('hidden');
+    e.stopPropagation();
+    e.preventDefault();
   }
   document.addEventListener('click', closeSavePanelOnOutsideInteraction, true);
   document.addEventListener('touchend', closeSavePanelOnOutsideInteraction, true);
@@ -975,6 +978,11 @@ function setupBackupControls() {
     backupInfo.seenAtLastBackup = seen.size - Math.floor(BACKUP_REMINDER_THRESHOLD / 2);
     saveBackupInfo();
     hideBackupReminder();
+  });
+
+  // Close backup reminder on backdrop click
+  document.getElementById('backup-reminder').addEventListener('click', (e) => {
+    if (e.target.id === 'backup-reminder') hideBackupReminder();
   });
 
   updateBackupDisplay();
