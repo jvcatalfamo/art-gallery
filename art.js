@@ -775,7 +775,7 @@ function renderEditAlbumsList() {
   const list = document.getElementById('edit-albums-list');
   list.innerHTML = albums.map(album => `
     <div class="edit-album-row" data-album-id="${album.id}">
-      <input type="text" value="${album.name}" placeholder="Album name">
+      <input type="text" value="${album.name}" placeholder="Album name" maxlength="12">
       <button class="delete-album-btn" title="Delete">×</button>
     </div>
   `).join('');
@@ -788,7 +788,7 @@ function renderEditAlbumsList() {
     input.addEventListener('change', () => {
       const album = albums.find(a => a.id === albumId);
       if (album) {
-        album.name = input.value || 'Untitled';
+        album.name = (input.value || 'Untitled').slice(0, 12);
         saveAlbums();
       }
     });
@@ -806,7 +806,7 @@ function renderEditAlbumsList() {
 function addNewAlbum() {
   const newAlbum = {
     id: 'album_' + Date.now(),
-    name: 'New Album',
+    name: 'New',
     artworks: []
   };
   albums.push(newAlbum);
