@@ -324,30 +324,29 @@ function setupControls() {
     }
   });
 
-  // Close save panel on outside click/touch
-  function closeSavePanelOnOutsideInteraction(e) {
+  // Close save panel on outside click only (not touch - let click handle it)
+  function closeSavePanelOnOutsideClick(e) {
     // Only act if save panel is actually visible
     if (savePanel.classList.contains('hidden')) return;
 
-    // Get the actual target element
-    let target = e.target;
-    if (e.type === 'touchend' && e.changedTouches && e.changedTouches[0]) {
-      target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY) || target;
-    }
+    const target = e.target;
 
-    // Don't interfere with modals, dialogs, or any overlay content
+    // Don't interfere with anything inside save panel, modals, or buttons
     if (!target) return;
-    if (target.closest('.modal')) return;
     if (target.closest('#save-panel')) return;
+    if (target.closest('.modal')) return;
     if (target.closest('.icon-btn')) return;
+    if (target.closest('button')) return;
+    if (target.closest('label')) return;
+    if (target.closest('input')) return;
 
     // Close the save panel and prevent navigation
     savePanel.classList.add('hidden');
     e.stopPropagation();
     e.preventDefault();
   }
-  document.addEventListener('click', closeSavePanelOnOutsideInteraction, true);
-  document.addEventListener('touchend', closeSavePanelOnOutsideInteraction, true);
+  // Only use click - it fires on both desktop and mobile (after touch)
+  document.addEventListener('click', closeSavePanelOnOutsideClick, true);
 
   // Edit collections
   document.getElementById('edit-albums-btn').addEventListener('click', showEditAlbumsModal);
