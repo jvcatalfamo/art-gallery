@@ -534,31 +534,54 @@ function renderAlbumCheckboxes() {
     noteInput.value = '';
   }
 
+  // Handle checkbox changes - use both click and change for mobile compatibility
+  function handleCheckboxToggle(cb) {
+    const albumId = cb.dataset.albumId;
+    const album = albums.find(a => a.id === albumId);
+    if (!album) {
+      console.error('Album not found:', albumId);
+      return;
+    }
+
+    if (cb.checked) {
+      if (!album.artworks.includes(poemId)) {
+        album.artworks.push(poemId);
+        console.log('Added to album:', album.name, 'poemId:', poemId);
+      }
+    } else {
+      album.artworks = album.artworks.filter(id => id !== poemId);
+      if (album.notes) {
+        delete album.notes[poemId];
+      }
+      console.log('Removed from album:', album.name);
+    }
+
+    saveAlbums();
+    console.log('Albums saved. Total in', album.name + ':', album.artworks.length);
+
+    const nowInAnyAlbum = albums.some(a => a.artworks.includes(poemId));
+    if (nowInAnyAlbum) {
+      noteSection.classList.remove('hidden');
+    } else {
+      noteSection.classList.add('hidden');
+      noteInput.value = '';
+    }
+  }
+
   albumCheckboxes.querySelectorAll('input').forEach(cb => {
-    cb.addEventListener('change', (e) => {
-      const albumId = e.target.dataset.albumId;
-      const album = albums.find(a => a.id === albumId);
-      if (!album) return;
+    // Use change event (works on desktop)
+    cb.addEventListener('change', () => handleCheckboxToggle(cb));
 
-      if (e.target.checked) {
-        if (!album.artworks.includes(poemId)) {
-          album.artworks.push(poemId);
-        }
-      } else {
-        album.artworks = album.artworks.filter(id => id !== poemId);
-        if (album.notes) {
-          delete album.notes[poemId];
-        }
-      }
-      saveAlbums();
+    // Also handle click directly for mobile
+    cb.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent save panel from closing
+    });
+  });
 
-      const nowInAnyAlbum = albums.some(a => a.artworks.includes(poemId));
-      if (nowInAnyAlbum) {
-        noteSection.classList.remove('hidden');
-      } else {
-        noteSection.classList.add('hidden');
-        noteInput.value = '';
-      }
+  // Also handle clicks on labels for mobile
+  albumCheckboxes.querySelectorAll('label').forEach(label => {
+    label.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent save panel from closing
     });
   });
 }
@@ -832,8 +855,11 @@ function loadAlbums() {
     const data = localStorage.getItem(ALBUMS_KEY);
     if (data) {
       albums = JSON.parse(data);
-      console.log(`Loaded ${albums.length} collections`);
+      // Log how many poems are in each collection
+      albums.forEach(a => console.log(`Collection "${a.name}": ${a.artworks.length} poems`));
+      console.log(`Loaded ${albums.length} collections from localStorage`);
     } else {
+      console.log('No collection data found, using defaults');
       albums = JSON.parse(JSON.stringify(DEFAULT_ALBUMS));
       saveAlbums();
     }
@@ -845,9 +871,17 @@ function loadAlbums() {
 
 function saveAlbums() {
   try {
-    localStorage.setItem(ALBUMS_KEY, JSON.stringify(albums));
+    const data = JSON.stringify(albums);
+    localStorage.setItem(ALBUMS_KEY, data);
+    console.log('saveAlbums: Saved', albums.length, 'collections to localStorage');
+    // Verify save worked
+    const verify = localStorage.getItem(ALBUMS_KEY);
+    if (verify !== data) {
+      console.error('saveAlbums: Verification failed! Data mismatch.');
+    }
   } catch (e) {
     console.error('Failed to save collections:', e);
+    alert('Failed to save! ' + e.message);
   }
 }
 
