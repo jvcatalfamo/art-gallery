@@ -474,28 +474,6 @@ function setupControls() {
     if (e.target.id === 'edit-note-modal') closeNoteModal();
   });
 
-  // Note input in save panel - save on input with debounce
-  const noteInput = document.getElementById('note-input');
-  noteInput.addEventListener('input', debounce(() => {
-    const painting = getCurrentPainting();
-    if (!painting) return;
-
-    const paintingId = getPaintingId(painting);
-    const note = noteInput.value.trim();
-
-    // Save note to all albums that have this artwork
-    for (const album of albums) {
-      if (album.artworks.includes(paintingId)) {
-        if (!album.notes) album.notes = {};
-        if (note) {
-          album.notes[paintingId] = note;
-        } else {
-          delete album.notes[paintingId];
-        }
-      }
-    }
-    saveAlbums();
-  }, 500));
 }
 
 // Note modal functions
@@ -555,8 +533,6 @@ function renderAlbumCheckboxes() {
   if (!painting) return;
 
   const paintingId = getPaintingId(painting);
-  const noteSection = document.getElementById('note-section');
-  const noteInput = document.getElementById('note-input');
 
   albumCheckboxes.innerHTML = albums.map(album => {
     const isIn = album.artworks.includes(paintingId);
@@ -568,21 +544,7 @@ function renderAlbumCheckboxes() {
     `;
   }).join('');
 
-  // Show note section if in any album
-  const isInAnyAlbum = albums.some(a => a.artworks.includes(paintingId));
-  if (isInAnyAlbum) {
-    noteSection.classList.remove('hidden');
-    // Load existing note from the first album that has this artwork
-    const albumWithNote = albums.find(a =>
-      a.artworks.includes(paintingId) && a.notes && a.notes[paintingId]
-    );
-    noteInput.value = albumWithNote ? albumWithNote.notes[paintingId] : '';
-  } else {
-    noteSection.classList.add('hidden');
-    noteInput.value = '';
-  }
-
-  // Handle checkbox changes - use both click and change for mobile compatibility
+  // Handle checkbox changes
   function handleCheckboxToggle(cb) {
     const albumId = cb.dataset.albumId;
     const album = albums.find(a => a.id === albumId);
@@ -606,15 +568,6 @@ function renderAlbumCheckboxes() {
 
     saveAlbums();
     console.log('Albums saved. Total in', album.name + ':', album.artworks.length);
-
-    // Update note section visibility
-    const nowInAnyAlbum = albums.some(a => a.artworks.includes(paintingId));
-    if (nowInAnyAlbum) {
-      noteSection.classList.remove('hidden');
-    } else {
-      noteSection.classList.add('hidden');
-      noteInput.value = '';
-    }
   }
 
   albumCheckboxes.querySelectorAll('input').forEach(cb => {

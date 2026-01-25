@@ -369,27 +369,6 @@ function setupControls() {
     if (e.target.id === 'edit-note-modal') closeNoteModal();
   });
 
-  // Note input in save panel
-  const noteInput = document.getElementById('note-input');
-  noteInput.addEventListener('input', debounce(() => {
-    const poem = getCurrentPoem();
-    if (!poem) return;
-
-    const poemId = getPoemId(poem);
-    const note = noteInput.value.trim();
-
-    for (const album of albums) {
-      if (album.artworks.includes(poemId)) {
-        if (!album.notes) album.notes = {};
-        if (note) {
-          album.notes[poemId] = note;
-        } else {
-          delete album.notes[poemId];
-        }
-      }
-    }
-    saveAlbums();
-  }, 500));
 }
 
 // Touch navigation
@@ -509,8 +488,6 @@ function renderAlbumCheckboxes() {
   if (!poem) return;
 
   const poemId = getPoemId(poem);
-  const noteSection = document.getElementById('note-section');
-  const noteInput = document.getElementById('note-input');
 
   albumCheckboxes.innerHTML = albums.map(album => {
     const isIn = album.artworks.includes(poemId);
@@ -522,19 +499,7 @@ function renderAlbumCheckboxes() {
     `;
   }).join('');
 
-  const isInAnyAlbum = albums.some(a => a.artworks.includes(poemId));
-  if (isInAnyAlbum) {
-    noteSection.classList.remove('hidden');
-    const albumWithNote = albums.find(a =>
-      a.artworks.includes(poemId) && a.notes && a.notes[poemId]
-    );
-    noteInput.value = albumWithNote ? albumWithNote.notes[poemId] : '';
-  } else {
-    noteSection.classList.add('hidden');
-    noteInput.value = '';
-  }
-
-  // Handle checkbox changes - use both click and change for mobile compatibility
+  // Handle checkbox changes
   function handleCheckboxToggle(cb) {
     const albumId = cb.dataset.albumId;
     const album = albums.find(a => a.id === albumId);
@@ -546,26 +511,18 @@ function renderAlbumCheckboxes() {
     if (cb.checked) {
       if (!album.artworks.includes(poemId)) {
         album.artworks.push(poemId);
-        console.log('Added to album:', album.name, 'poemId:', poemId);
+        console.log('Added to collection:', album.name, 'poemId:', poemId);
       }
     } else {
       album.artworks = album.artworks.filter(id => id !== poemId);
       if (album.notes) {
         delete album.notes[poemId];
       }
-      console.log('Removed from album:', album.name);
+      console.log('Removed from collection:', album.name);
     }
 
     saveAlbums();
-    console.log('Albums saved. Total in', album.name + ':', album.artworks.length);
-
-    const nowInAnyAlbum = albums.some(a => a.artworks.includes(poemId));
-    if (nowInAnyAlbum) {
-      noteSection.classList.remove('hidden');
-    } else {
-      noteSection.classList.add('hidden');
-      noteInput.value = '';
-    }
+    console.log('Collections saved. Total in', album.name + ':', album.artworks.length);
   }
 
   albumCheckboxes.querySelectorAll('input').forEach(cb => {
