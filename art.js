@@ -148,6 +148,8 @@ async function loadPaintings() {
 }
 
 async function loadRestInBackground(pieces) {
+  // Don't compete with the first painting for bandwidth
+  await Promise.race([firstImage, new Promise(r => setTimeout(r, 5000))]);
   const queue = [...pieces];
   let failed = false;
   const worker = async () => {
@@ -156,15 +158,15 @@ async function loadRestInBackground(pieces) {
       try {
         const added = addPaintings(await fetchJSON(SHARDS_DIR + 'art-' + n + '.json'));
         // Mix the new arrivals into what's still ahead (never what you've passed)
-        const ahead = orderedList.slice(currentIndex + 1 + 3); // keep the 3 preloaded next
-        orderedList = [...orderedList.slice(0, currentIndex + 1 + 3), ...shuffle([...ahead, ...added])];
+        const ahead = orderedList.slice(currentIndex + 1 + 5); // keep the 5 preloaded next
+        orderedList = [...orderedList.slice(0, currentIndex + 1 + 5), ...shuffle([...ahead, ...added])];
       } catch (e) {
         console.error('Failed to load piece', n, e);
         failed = true;
       }
     }
   };
-  await Promise.all([worker(), worker()]);
+  await worker(); // one piece at a time leaves room for the images
   allLoaded = !failed;
   console.log('Loaded ' + paintings.length + ' paintings');
   // Screens that needed the full list (saved paintings, stats) can fill in now
@@ -192,6 +194,39 @@ function cleanImageUrl(url) {
   if (!url) return '';
   return url.replace(/![\w]+\.(jpg|jpeg|png|gif)$/i, '');
 }
+
+// Show WikiArt's HD version (1920px, usually 5-10x smaller than the original
+// file); fall back to the original when a painting has no HD version.
+// The original is still used when you zoom in.
+const imageCache = new Map(); // original url -> Promise<url that loaded>
+function loadImage(painting) {
+  const full = cleanImageUrl(painting.image);
+  if (imageCache.has(full)) return imageCache.get(full);
+  const tryUrl = url => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => reject(new Error('Failed to load ' + url));
+    img.src = url;
+  });
+  const p = (/wikiart\.org\//.test(full) ? tryUrl(full + '!HD.jpg') : Promise.reject())
+    .catch(() => tryUrl(full));
+  p.catch(() => imageCache.delete(full)); // allow a retry later
+  imageCache.set(full, p);
+  if (imageCache.size > 60) imageCache.delete(imageCache.keys().next().value);
+  return p;
+}
+
+// Zoomed in: swap to the full original for detail
+function upgradeToFull(img) {
+  const full = img.dataset.full;
+  if (!full || img.src === full) return;
+  const hi = new Image();
+  hi.onload = () => { if (img.dataset.full === full) img.src = full; };
+  hi.src = full;
+}
+
+let firstImageShown;
+const firstImage = new Promise(r => { firstImageShown = r; });
 
 // Known placeholder images that are shared by many paintings
 const PLACEHOLDER_IMAGES = new Set([
@@ -244,6 +279,7 @@ function setupZoom(img, containerId) {
       zoomScale = newScale;
       zoomedImg = img;
       applyZoom(img);
+      if (zoomScale > 1.3) upgradeToFull(img);
     } else if (e.touches.length === 1 && zoomedImg === img && zoomScale > 1) {
       e.preventDefault();
     }
@@ -278,6 +314,7 @@ function toggleZoom(img, x, y) {
     const percentY = ((y - rect.top) / rect.height) * 100;
     img.style.transformOrigin = `${percentX}% ${percentY}%`;
     applyZoom(img);
+    upgradeToFull(img);
   }
 }
 
@@ -387,22 +424,21 @@ function showCurrentArtwork() {
   loadingEl.classList.remove('hidden');
   artworkImg.classList.remove('loaded');
 
-  const imageUrl = cleanImageUrl(painting.image);
-  const img = new Image();
-  img.onload = () => {
+  loadImage(painting).then(url => {
     if (getCurrentPainting() !== painting) return; // user already moved on
     consecutiveFailures = 0;
     // Only count it as seen once it actually showed up
     seen.add(getPaintingId(painting));
     saveSeen();
-    artworkImg.src = imageUrl;
+    artworkImg.dataset.full = cleanImageUrl(painting.image);
+    artworkImg.src = url;
     artworkImg.classList.add('loaded');
     loadingEl.classList.add('hidden');
+    firstImageShown();
     preloadNext();
-  };
-  img.onerror = () => {
+  }).catch(() => {
     if (getCurrentPainting() !== painting) return;
-    console.warn('Failed to load:', imageUrl);
+    console.warn('Failed to load:', painting.image);
     consecutiveFailures++;
     // Offline or images blocked: stop instead of racing through the collection
     if (!navigator.onLine || consecutiveFailures >= 5) {
@@ -410,8 +446,7 @@ function showCurrentArtwork() {
       return;
     }
     setTimeout(next, 100);
-  };
-  img.src = imageUrl;
+  });
 
   titleEl.textContent = painting.title || 'Untitled';
   artistEl.textContent = painting.artistName || 'Unknown';
@@ -420,14 +455,10 @@ function showCurrentArtwork() {
 
 // Preload next few images for faster navigation
 function preloadNext() {
-  const preloadCount = 3; // Preload next 3 images
+  const preloadCount = 5;
   for (let i = 1; i <= preloadCount; i++) {
-    const nextIdx = (currentIndex + i) % orderedList.length;
-    const painting = orderedList[nextIdx];
-    if (painting && painting.image) {
-      const img = new Image();
-      img.src = cleanImageUrl(painting.image);
-    }
+    const painting = orderedList[(currentIndex + i) % orderedList.length];
+    if (painting && painting.image) loadImage(painting).catch(() => {});
   }
 }
 
@@ -470,14 +501,14 @@ function setupControls() {
       (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file'].includes(t.type)));
     if (typing) {
       // Escape still closes the popup you're typing in
-      if (e.key === 'Escape') { const m = t.closest('.modal'); if (m) m.classList.add('hidden'); }
+      if (e.key === 'Escape') { const m = t.closest('.modal'); if (m) closeModal(m); }
       return;
     }
     if (t && t.type === 'checkbox' && e.key === ' ') return; // Space ticks the box
     // With a popup open, Escape closes it and nothing else happens underneath
     const openModal = document.querySelector('.modal:not(.hidden)');
     if (openModal) {
-      if (e.key === 'Escape') openModal.classList.add('hidden');
+      if (e.key === 'Escape') closeModal(openModal);
       return;
     }
     if (albumDetailView.classList.contains('active')) {
@@ -587,6 +618,11 @@ function setupControls() {
   document.getElementById('close-edit-modal').addEventListener('click', hideEditAlbumsModal);
   document.getElementById('add-album-btn').addEventListener('click', addNewAlbum);
 
+  // Rename by tapping the title
+  const detailTitle = document.getElementById('album-detail-title');
+  detailTitle.title = 'Tap to rename';
+  detailTitle.addEventListener('click', startTitleRename);
+
   // Remove from album
   document.getElementById('remove-from-album-btn').addEventListener('click', removeFromCurrentAlbum);
 
@@ -665,6 +701,28 @@ function renderAlbumCheckboxes() {
       </label>
     `;
   }).join('');
+  // Type a name here to make a new album with this item already in it
+  albumCheckboxes.insertAdjacentHTML('beforeend',
+    '<input type="text" id="new-album-input" placeholder="+ New album" maxlength="24" autocomplete="off">');
+  const newInput = document.getElementById('new-album-input');
+  const createFromInput = () => {
+    const name = newInput.value.trim().slice(0, 24);
+    if (!name) return;
+    newInput.value = '';
+    updateAlbums(() => {
+      albums.push({ id: 'album_' + Date.now(), name, artworks: [paintingId] });
+    });
+    renderAlbumCheckboxes();
+  };
+  newInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); createFromInput(); }
+    else if (e.key === 'Escape') { newInput.value = ''; newInput.blur(); savePanel.classList.add('hidden'); }
+  });
+  newInput.addEventListener('blur', createFromInput);
+
+  if (albums.length === 0) {
+    albumCheckboxes.insertAdjacentHTML('afterbegin', '<p style="color: #777; font-size: 12px; font-style: italic;">No albums yet \u2014 make one in My Albums (\u2630 at top) with the pencil, or type a name below.</p>');
+  }
 
   // Handle checkbox changes
   function handleCheckboxToggle(cb) {
@@ -716,9 +774,58 @@ function debounce(fn, delay) {
   };
 }
 
+// Tap the title in a album's view to rename it
+function startTitleRename() {
+  const title = document.getElementById('album-detail-title');
+  if (document.getElementById('album-title-input')) return;
+  refreshAlbums();
+  const album = albums.find(a => a.id === currentAlbumId);
+  if (!album) return;
+  const input = document.createElement('input');
+  input.id = 'album-title-input';
+  input.type = 'text';
+  input.maxLength = 24;
+  input.value = album.name;
+  input.autocomplete = 'off';
+  title.style.display = 'none';
+  title.after(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim().slice(0, 24);
+    if (save && name && name !== album.name) {
+      updateAlbums(() => {
+        const a = albums.find(a => a.id === currentAlbumId);
+        if (a) a.name = name;
+      });
+    }
+    input.remove();
+    title.style.display = '';
+    renderAlbumDetail();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+// Close a popup the same way its × button does (commit a half-typed album
+// name, refresh the list behind it)
+function closeModal(m) {
+  if (document.activeElement && m.contains(document.activeElement)) document.activeElement.blur();
+  if (m.id === 'edit-albums-modal') hideEditAlbumsModal();
+  else if (m.id === 'ai-modal' && typeof stopBreathing === 'function') { m.classList.add('hidden'); stopBreathing(); }
+  else m.classList.add('hidden');
+}
+
 // View switching
 function showView(viewEl) {
   savePanel.classList.add('hidden');
+  resetZoom();
   [galleryView, statsView, albumsView, albumDetailView].forEach(v => v.classList.remove('active'));
   viewEl.classList.add('active');
 }
@@ -757,7 +864,7 @@ function renderAlbumsList() {
     return `
       <div class="album-item" data-album-id="${escapeHtml(album.id)}">
         <div class="album-icon">
-          ${thumbUrl ? `<img src="${escapeHtml(thumbUrl)}" alt="">` : ''}
+          ${thumbUrl ? `<img src="${escapeHtml(thumbUrl + '!Large.jpg')}" data-full="${escapeHtml(thumbUrl)}" alt="">` : ''}
         </div>
         <div class="album-info">
           <div class="album-name">${escapeHtml(album.name)}</div>
@@ -766,6 +873,13 @@ function renderAlbumsList() {
       </div>
     `;
   }).join('');
+
+  // No small version for this painting: use the original
+  list.querySelectorAll('.album-icon img').forEach(img => {
+    img.addEventListener('error', () => {
+      if (img.getAttribute('src') !== img.dataset.full) img.src = img.dataset.full;
+    });
+  });
 
   list.querySelectorAll('.album-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -777,7 +891,12 @@ function renderAlbumsList() {
 // Album detail view
 function renderAlbumDetail() {
   const album = albums.find(a => a.id === currentAlbumId);
-  if (!album) return;
+  if (!album) {
+    // Deleted on another device or tab while open: go back to the list
+    if (albumDetailView.classList.contains('active')) showAlbums();
+    return;
+  }
+  document.getElementById('remove-from-album-btn').classList.toggle('hidden', album.artworks.length === 0);
 
   // Another tab may have shrunk this album
   if (currentAlbumIndex >= album.artworks.length) {
@@ -787,7 +906,7 @@ function renderAlbumDetail() {
 
   document.getElementById('album-detail-title').textContent = album.name;
   document.getElementById('album-detail-count').textContent =
-    `${currentAlbumIndex + 1} / ${album.artworks.length}`;
+    album.artworks.length ? `${currentAlbumIndex + 1} / ${album.artworks.length}` : '';
 
   const emptyEl = document.getElementById('album-empty');
   const artworkEl = document.getElementById('album-artwork');
@@ -840,19 +959,16 @@ function renderAlbumDetail() {
   loadingEl.classList.remove('hidden');
   artworkEl.classList.remove('loaded');
 
-  const imageUrl = cleanImageUrl(painting.image);
-  const img = new Image();
-  img.onload = () => {
+  loadImage(painting).then(url => {
     if (currentAlbumArtworkId !== artworkId) return; // user already moved on
-    artworkEl.src = imageUrl;
+    artworkEl.dataset.full = cleanImageUrl(painting.image);
+    artworkEl.src = url;
     artworkEl.classList.add('loaded');
     loadingEl.classList.add('hidden');
-  };
-  img.onerror = () => {
+  }).catch(() => {
     if (currentAlbumArtworkId !== artworkId) return;
     loadingEl.textContent = 'Failed to load';
-  };
-  img.src = imageUrl;
+  });
 
   document.getElementById('album-art-title').textContent = painting.title || 'Untitled';
   document.getElementById('album-art-artist').textContent = painting.artistName || 'Unknown';
@@ -908,7 +1024,7 @@ function renderEditAlbumsList() {
   refreshAlbums();
   list.innerHTML = albums.map(album => `
     <div class="edit-album-row" data-album-id="${escapeHtml(album.id)}">
-      <input type="text" value="${escapeHtml(album.name)}" placeholder="Album name" maxlength="12">
+      <input type="text" value="${escapeHtml(album.name)}" placeholder="Album name" maxlength="24">
       <button class="delete-album-btn" title="Delete">×</button>
     </div>
   `).join('');
@@ -921,7 +1037,7 @@ function renderEditAlbumsList() {
     input.addEventListener('change', () => {
       updateAlbums(() => {
         const album = albums.find(a => a.id === albumId);
-        if (album) album.name = (input.value || 'Untitled').slice(0, 12);
+        if (album) album.name = (input.value || 'Untitled').slice(0, 24);
       });
     });
 
@@ -1414,7 +1530,7 @@ async function requestInterpretation() {
   };
 
   try {
-    const imageUrl = cleanImageUrl(painting.image);
+    const imageUrl = await loadImage(painting);
 
     // Convert image to base64 (WikiArt URLs can't be fetched directly by Claude)
     const imageBase64 = await imageToBase64(imageUrl);

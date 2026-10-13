@@ -1,0 +1,50 @@
+/* Album naming: "+ New album" in the save panel, tap-to-rename titles */
+
+#album-checkboxes label {
+  overflow-wrap: anywhere;
+}
+
+#new-album-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 0;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: #999;
+  font-family: inherit;
+  font-style: italic;
+  font-size: 16px; /* 16px keeps iPhone from zooming in on focus */
+  transform: scale(0.75);
+  transform-origin: left center;
+  width: 133%;
+  outline: none;
+}
+
+#new-album-input::placeholder {
+  color: #666;
+}
+
+#album-detail-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+#album-detail-title:hover {
+  color: #fff;
+}
+
+#album-title-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ddd;
+  font-family: inherit;
+  font-size: 18px;
+  letter-spacing: 2px;
+  padding: 2px 0;
+  outline: none;
+}

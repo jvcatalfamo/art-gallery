@@ -31,7 +31,10 @@ split(rows, ART_PIECES).forEach((piece, i) => fs.writeFileSync(path.join(OUT, `a
 
 // ---- poems: raw items, just split ----
 const raw = fs.readFileSync(path.join(__dirname, 'poems-data.json'), 'utf8').replace(/^﻿/, '');
-const poems = JSON.parse(raw).map(p => ({ title: p.title, author: p.author, content: p.content }));
+// Drop the ~120 scraped entries with no real text (they showed as blank pages)
+const poems = JSON.parse(raw)
+  .filter(p => (p.content || '').replace(/\s+/g, ' ').trim().length >= 25)
+  .map(p => ({ title: p.title, author: p.author, content: p.content }));
 const POEM_PIECES = 32;
 split(poems, POEM_PIECES).forEach((piece, i) => fs.writeFileSync(path.join(OUT, `poems-${i}.json`), JSON.stringify(piece)));
 

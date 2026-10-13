@@ -6,7 +6,7 @@ const BACKUP_KEY = 'poetry_backup_info';
 const BACKUP_REMINDER_THRESHOLD = 10; // Remind after 10 new saves
 
 // Poetry Foundation data (13,854 poems), served in pieces from data/shards/
-const TOTAL_POEMS = 13854;
+let totalPoems = 0; // from the manifest
 
 let poems = [];
 let poemsMap = {};
@@ -216,6 +216,7 @@ function addPoems(data) {
       author: fixEncoding((item.author || 'Unknown').trim()),
       content: cleanPoemContent(item.content)
     };
+    if (!poem.content.trim()) continue; // never show a blank page
     const id = getPoemId(poem);
     if (!poemsMap[id]) {
       poems.push(poem);
@@ -232,6 +233,7 @@ async function loadPoems() {
     poems = [];
     poemsMap = {};
     const manifest = await fetchJSON(SHARDS_DIR + 'manifest.json');
+    totalPoems = manifest.poems.count;
     const order = shuffle([...Array(manifest.poems.pieces).keys()]);
     addPoems(await fetchJSON(SHARDS_DIR + 'poems-' + order[0] + '.json'));
     console.log('First piece: ' + poems.length + ' poems');
@@ -350,14 +352,14 @@ function setupControls() {
       (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file'].includes(t.type)));
     if (typing) {
       // Escape still closes the popup you're typing in
-      if (e.key === 'Escape') { const m = t.closest('.modal'); if (m) m.classList.add('hidden'); }
+      if (e.key === 'Escape') { const m = t.closest('.modal'); if (m) closeModal(m); }
       return;
     }
     if (t && t.type === 'checkbox' && e.key === ' ') return; // Space ticks the box
     // With a popup open, Escape closes it and nothing else happens underneath
     const openModal = document.querySelector('.modal:not(.hidden)');
     if (openModal) {
-      if (e.key === 'Escape') openModal.classList.add('hidden');
+      if (e.key === 'Escape') closeModal(openModal);
       return;
     }
     if (albumDetailView.classList.contains('active')) {
@@ -447,6 +449,11 @@ function setupControls() {
   document.getElementById('edit-albums-btn').addEventListener('click', showEditAlbumsModal);
   document.getElementById('close-edit-modal').addEventListener('click', hideEditAlbumsModal);
   document.getElementById('add-album-btn').addEventListener('click', addNewAlbum);
+
+  // Rename by tapping the title
+  const detailTitle = document.getElementById('album-detail-title');
+  detailTitle.title = 'Tap to rename';
+  detailTitle.addEventListener('click', startTitleRename);
 
   // Remove from collection
   document.getElementById('remove-from-album-btn').addEventListener('click', removeFromCurrentAlbum);
@@ -586,6 +593,28 @@ function renderAlbumCheckboxes() {
       </label>
     `;
   }).join('');
+  // Type a name here to make a new collection with this item already in it
+  albumCheckboxes.insertAdjacentHTML('beforeend',
+    '<input type="text" id="new-album-input" placeholder="+ New collection" maxlength="24" autocomplete="off">');
+  const newInput = document.getElementById('new-album-input');
+  const createFromInput = () => {
+    const name = newInput.value.trim().slice(0, 24);
+    if (!name) return;
+    newInput.value = '';
+    updateAlbums(() => {
+      albums.push({ id: 'album_' + Date.now(), name, artworks: [poemId] });
+    });
+    renderAlbumCheckboxes();
+  };
+  newInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); createFromInput(); }
+    else if (e.key === 'Escape') { newInput.value = ''; newInput.blur(); savePanel.classList.add('hidden'); }
+  });
+  newInput.addEventListener('blur', createFromInput);
+
+  if (albums.length === 0) {
+    albumCheckboxes.insertAdjacentHTML('afterbegin', '<p style="color: #777; font-size: 12px; font-style: italic;">No collections yet \u2014 make one in My Collections (\u2630 at top) with the pencil, or type a name below.</p>');
+  }
 
   // Handle checkbox changes
   function handleCheckboxToggle(cb) {
@@ -634,6 +663,54 @@ function debounce(fn, delay) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn.apply(this, args), delay);
   };
+}
+
+// Tap the title in a collection's view to rename it
+function startTitleRename() {
+  const title = document.getElementById('album-detail-title');
+  if (document.getElementById('album-title-input')) return;
+  refreshAlbums();
+  const album = albums.find(a => a.id === currentAlbumId);
+  if (!album) return;
+  const input = document.createElement('input');
+  input.id = 'album-title-input';
+  input.type = 'text';
+  input.maxLength = 24;
+  input.value = album.name;
+  input.autocomplete = 'off';
+  title.style.display = 'none';
+  title.after(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim().slice(0, 24);
+    if (save && name && name !== album.name) {
+      updateAlbums(() => {
+        const a = albums.find(a => a.id === currentAlbumId);
+        if (a) a.name = name;
+      });
+    }
+    input.remove();
+    title.style.display = '';
+    renderAlbumDetail();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+// Close a popup the same way its × button does (commit a half-typed album
+// name, refresh the list behind it)
+function closeModal(m) {
+  if (document.activeElement && m.contains(document.activeElement)) document.activeElement.blur();
+  if (m.id === 'edit-albums-modal') hideEditAlbumsModal();
+  else if (m.id === 'ai-modal' && typeof stopBreathing === 'function') { m.classList.add('hidden'); stopBreathing(); }
+  else m.classList.add('hidden');
 }
 
 // View switching
@@ -696,7 +773,12 @@ function renderAlbumsList() {
 // Collection detail view
 function renderAlbumDetail() {
   const album = albums.find(a => a.id === currentAlbumId);
-  if (!album) return;
+  if (!album) {
+    // Deleted on another device or tab while open: go back to the list
+    if (albumDetailView.classList.contains('active')) showAlbums();
+    return;
+  }
+  document.getElementById('remove-from-album-btn').classList.toggle('hidden', album.artworks.length === 0);
 
   // Another tab may have shrunk this collection
   if (currentAlbumIndex >= album.artworks.length) {
@@ -706,7 +788,7 @@ function renderAlbumDetail() {
 
   document.getElementById('album-detail-title').textContent = album.name;
   document.getElementById('album-detail-count').textContent =
-    `${currentAlbumIndex + 1} / ${album.artworks.length}`;
+    album.artworks.length ? `${currentAlbumIndex + 1} / ${album.artworks.length}` : '';
 
   const emptyEl = document.getElementById('album-empty');
   const poemEl = document.getElementById('album-poem-text');
@@ -805,7 +887,7 @@ function renderEditAlbumsList() {
   refreshAlbums();
   list.innerHTML = albums.map(album => `
     <div class="edit-album-row" data-album-id="${escapeHtml(album.id)}">
-      <input type="text" value="${escapeHtml(album.name)}" placeholder="Collection name" maxlength="12">
+      <input type="text" value="${escapeHtml(album.name)}" placeholder="Collection name" maxlength="24">
       <button class="delete-album-btn" title="Delete">×</button>
     </div>
   `).join('');
@@ -818,7 +900,7 @@ function renderEditAlbumsList() {
     input.addEventListener('change', () => {
       updateAlbums(() => {
         const album = albums.find(a => a.id === albumId);
-        if (album) album.name = (input.value || 'Untitled').slice(0, 12);
+        if (album) album.name = (input.value || 'Untitled').slice(0, 24);
       });
     });
 
@@ -850,7 +932,7 @@ function addNewAlbum() {
 
 // Render stats
 function renderStats() {
-  const total = TOTAL_POEMS; // Use actual total from Poetry Foundation
+  const total = totalPoems || poems.length;
   const seenCount = seen.size;
   const percent = total > 0 ? (seenCount / total * 100).toFixed(1) : 0;
 
