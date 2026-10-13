@@ -68,6 +68,20 @@ async function init() {
   checkBackupReminder();
   // Ask the browser not to evict our data (helps on Android/Chrome; harmless elsewhere)
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  // Keep saves in step with your other devices
+  if (window.Sync) Sync.init({
+    app: 'poetry',
+    albumsKey: ALBUMS_KEY,
+    seenKey: STORAGE_KEY,
+    onMerged: () => {
+      refreshAlbums();
+      try { seen = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')); } catch (e) {}
+      if (albumsView.classList.contains('active')) renderAlbumsList();
+      if (albumDetailView.classList.contains('active')) renderAlbumDetail();
+      if (!savePanel.classList.contains('hidden')) renderAlbumCheckboxes();
+      if (statsView.classList.contains('active')) { renderStats(); updateBackupDisplay(); }
+    }
+  });
 }
 
 // Fix encoding issues - garbled UTF-8 smart quotes, dashes, and accented characters
@@ -292,7 +306,11 @@ function setupControls() {
     const t = e.target;
     const typing = t && (t.tagName === 'TEXTAREA' || t.isContentEditable ||
       (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file'].includes(t.type)));
-    if (typing) return;
+    if (typing) {
+      // Escape still closes the popup you're typing in
+      if (e.key === 'Escape') { const m = t.closest('.modal'); if (m) m.classList.add('hidden'); }
+      return;
+    }
     if (t && t.type === 'checkbox' && e.key === ' ') return; // Space ticks the box
     // With a popup open, Escape closes it and nothing else happens underneath
     const openModal = document.querySelector('.modal:not(.hidden)');
@@ -910,6 +928,7 @@ function saveAlbums() {
     }
   }
   checkBackupReminder();
+  if (window.Sync) Sync.changed();
 }
 
 function countSaved() {
@@ -941,6 +960,8 @@ function saveBackupInfo() {
 // after 10 new saves, or once saves have gone 3 days without a backup
 // (phone browsers can wipe site data after ~7 days away)
 function checkBackupReminder() {
+  // Synced saves live online too; no need to nag about exports
+  if (window.Sync && Sync.isOn()) return;
   const now = Date.now();
   const newSinceLast = countSaved() - backupInfo.savedAtLastBackup;
   if (newSinceLast <= 0) {
