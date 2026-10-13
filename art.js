@@ -1078,6 +1078,7 @@ async function exportData() {
   refreshAlbums();
   const data = {
     version: 1,
+    type: 'art',
     exportDate: new Date().toISOString(),
     seen: [...seen],
     albums: albums
@@ -1130,6 +1131,11 @@ function importData(file) {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
+      // Old art backups have no type; anything typed must be an art backup
+      if (data.type && data.type !== 'art') {
+        alert('That isn’t an art backup (poetry backups go in the poetry section).');
+        return;
+      }
       let added = 0;
 
       if (data.seen && Array.isArray(data.seen)) {

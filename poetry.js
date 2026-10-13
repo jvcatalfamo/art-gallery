@@ -3,7 +3,7 @@
 const STORAGE_KEY = 'poetry_seen';
 const ALBUMS_KEY = 'poetry_albums';
 const BACKUP_KEY = 'poetry_backup_info';
-const BACKUP_REMINDER_THRESHOLD = 50;
+const BACKUP_REMINDER_THRESHOLD = 10; // Remind after 10 new saves
 
 // Local poetry data (13,854 poems from Poetry Foundation)
 const POEMS_DATA_URL = 'poems-data.json';
@@ -19,6 +19,11 @@ let seen = new Set();
 let albums = [];
 let currentAlbumId = null;
 let currentAlbumIndex = 0;
+let currentAlbumPoemId = null; // the poem actually on screen in collection view
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // Default collections
 const DEFAULT_ALBUMS = [
@@ -30,7 +35,8 @@ const DEFAULT_ALBUMS = [
 // Backup tracking
 let backupInfo = {
   lastBackup: null,
-  seenAtLastBackup: 0
+  seenAtLastBackup: 0,
+  savedAtLastBackup: 0
 };
 
 // DOM elements
@@ -51,14 +57,17 @@ const albumCheckboxes = document.getElementById('album-checkboxes');
 
 // Initialize
 async function init() {
+  loadBackupInfo();
   loadSeen();
   loadAlbums();
-  loadBackupInfo();
   await loadPoems();
   applySort();
   showCurrentPoem();
   setupControls();
   setupBackupControls();
+  checkBackupReminder();
+  // Ask the browser not to evict our data (helps on Android/Chrome; harmless elsewhere)
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
 
 // Fix encoding issues - garbled UTF-8 smart quotes, dashes, and accented characters
@@ -238,6 +247,9 @@ function showCurrentPoem() {
   const poem = orderedList[currentIndex];
   if (!poem) return;
 
+  // The save panel belongs to one poem; never leave it open on another
+  savePanel.classList.add('hidden');
+
   seen.add(getPoemId(poem));
   saveSeen();
 
@@ -275,6 +287,19 @@ function getCurrentPoem() {
 function setupControls() {
   // Keyboard
   document.addEventListener('keydown', (e) => {
+    // Typing in a text box (note, collection name) must never trigger
+    // shortcuts: space/arrows/Backspace/'s' would navigate away mid-typing
+    const t = e.target;
+    const typing = t && (t.tagName === 'TEXTAREA' || t.isContentEditable ||
+      (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file'].includes(t.type)));
+    if (typing) return;
+    if (t && t.type === 'checkbox' && e.key === ' ') return; // Space ticks the box
+    // With a popup open, Escape closes it and nothing else happens underneath
+    const openModal = document.querySelector('.modal:not(.hidden)');
+    if (openModal) {
+      if (e.key === 'Escape') openModal.classList.add('hidden');
+      return;
+    }
     if (albumDetailView.classList.contains('active')) {
       if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
@@ -347,6 +372,16 @@ function setupControls() {
   }
   // Only use click - it fires on both desktop and mobile (after touch)
   document.addEventListener('click', closeSavePanelOnOutsideClick, true);
+
+  // Another tab changed the collections: pick that up so we never write back stale data
+  window.addEventListener('storage', (e) => {
+    if (e.key === ALBUMS_KEY) {
+      refreshAlbums();
+      if (albumsView.classList.contains('active')) renderAlbumsList();
+      if (albumDetailView.classList.contains('active')) renderAlbumDetail();
+      if (!savePanel.classList.contains('hidden')) renderAlbumCheckboxes();
+    }
+  });
 
   // Edit collections
   document.getElementById('edit-albums-btn').addEventListener('click', showEditAlbumsModal);
@@ -432,10 +467,11 @@ function setupTouchNav(el, prevFn, nextFn) {
 
 // Note modal functions
 function openNoteModal() {
+  refreshAlbums();
   const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
+  const poemId = currentAlbumPoemId;
+  if (!album || !poemId) return;
 
-  const poemId = album.artworks[currentAlbumIndex];
   const currentNote = album.notes && album.notes[poemId] || '';
 
   document.getElementById('edit-note-input').value = currentNote;
@@ -446,39 +482,31 @@ function closeNoteModal() {
   document.getElementById('edit-note-modal').classList.add('hidden');
 }
 
-function saveNoteFromModal() {
-  const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
-
-  const poemId = album.artworks[currentAlbumIndex];
-  const note = document.getElementById('edit-note-input').value.trim();
-
-  if (!album.notes) album.notes = {};
-
-  if (note) {
-    album.notes[poemId] = note;
-  } else {
-    delete album.notes[poemId];
-  }
-
-  saveAlbums();
+// Notes are keyed by the poem on screen, not by index, so a change made
+// in another tab can't shift the note onto a different poem
+function setNoteForCurrent(note) {
+  const poemId = currentAlbumPoemId;
+  if (!poemId) return;
+  updateAlbums(() => {
+    const album = albums.find(a => a.id === currentAlbumId);
+    if (!album || !album.artworks.includes(poemId)) return;
+    if (!album.notes) album.notes = {};
+    if (note) {
+      album.notes[poemId] = note;
+    } else {
+      delete album.notes[poemId];
+    }
+  });
   closeNoteModal();
   renderAlbumDetail();
 }
 
+function saveNoteFromModal() {
+  setNoteForCurrent(document.getElementById('edit-note-input').value.trim());
+}
+
 function deleteNoteFromModal() {
-  const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
-
-  const poemId = album.artworks[currentAlbumIndex];
-
-  if (album.notes) {
-    delete album.notes[poemId];
-  }
-
-  saveAlbums();
-  closeNoteModal();
-  renderAlbumDetail();
+  setNoteForCurrent('');
 }
 
 // Collection checkboxes
@@ -488,12 +516,13 @@ function renderAlbumCheckboxes() {
 
   const poemId = getPoemId(poem);
 
+  refreshAlbums();
   albumCheckboxes.innerHTML = albums.map(album => {
     const isIn = album.artworks.includes(poemId);
     return `
       <label>
-        <input type="checkbox" data-album-id="${album.id}" ${isIn ? 'checked' : ''}>
-        ${album.name}
+        <input type="checkbox" data-album-id="${escapeHtml(album.id)}" ${isIn ? 'checked' : ''}>
+        ${escapeHtml(album.name)}
       </label>
     `;
   }).join('');
@@ -501,27 +530,24 @@ function renderAlbumCheckboxes() {
   // Handle checkbox changes
   function handleCheckboxToggle(cb) {
     const albumId = cb.dataset.albumId;
-    const album = albums.find(a => a.id === albumId);
-    if (!album) {
-      console.error('Album not found:', albumId);
-      return;
-    }
-
-    if (cb.checked) {
-      if (!album.artworks.includes(poemId)) {
-        album.artworks.push(poemId);
-        console.log('Added to collection:', album.name, 'poemId:', poemId);
+    updateAlbums(() => {
+      const album = albums.find(a => a.id === albumId);
+      if (!album) {
+        console.error('Collection not found:', albumId);
+        return;
       }
-    } else {
-      album.artworks = album.artworks.filter(id => id !== poemId);
-      if (album.notes) {
-        delete album.notes[poemId];
-      }
-      console.log('Removed from collection:', album.name);
-    }
 
-    saveAlbums();
-    console.log('Collections saved. Total in', album.name + ':', album.artworks.length);
+      if (cb.checked) {
+        if (!album.artworks.includes(poemId)) {
+          album.artworks.push(poemId);
+        }
+      } else {
+        album.artworks = album.artworks.filter(id => id !== poemId);
+        if (album.notes) {
+          delete album.notes[poemId];
+        }
+      }
+    });
   }
 
   albumCheckboxes.querySelectorAll('input').forEach(cb => {
@@ -552,6 +578,7 @@ function debounce(fn, delay) {
 
 // View switching
 function showView(viewEl) {
+  savePanel.classList.add('hidden');
   [poetryView, statsView, albumsView, albumDetailView].forEach(v => v.classList.remove('active'));
   viewEl.classList.add('active');
 }
@@ -581,17 +608,18 @@ function showAlbumDetail(albumId) {
 // Collections list
 function renderAlbumsList() {
   const list = document.getElementById('albums-list');
+  refreshAlbums();
   list.innerHTML = albums.map(album => {
     const count = album.artworks.length;
     return `
-      <div class="album-item" data-album-id="${album.id}">
+      <div class="album-item" data-album-id="${escapeHtml(album.id)}">
         <div class="album-icon">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="#666">
             <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/>
           </svg>
         </div>
         <div class="album-info">
-          <div class="album-name">${album.name}</div>
+          <div class="album-name">${escapeHtml(album.name)}</div>
           <div class="album-count">${count} poem${count !== 1 ? 's' : ''}</div>
         </div>
       </div>
@@ -609,6 +637,12 @@ function renderAlbumsList() {
 function renderAlbumDetail() {
   const album = albums.find(a => a.id === currentAlbumId);
   if (!album) return;
+
+  // Another tab may have shrunk this collection
+  if (currentAlbumIndex >= album.artworks.length) {
+    currentAlbumIndex = Math.max(0, album.artworks.length - 1);
+  }
+  currentAlbumPoemId = album.artworks[currentAlbumIndex] || null;
 
   document.getElementById('album-detail-title').textContent = album.name;
   document.getElementById('album-detail-count').textContent =
@@ -633,11 +667,15 @@ function renderAlbumDetail() {
   }
 
   emptyEl.classList.add('hidden');
-  const poemId = album.artworks[currentAlbumIndex];
+  const poemId = currentAlbumPoemId;
   const poem = poemsMap[poemId];
 
   if (!poem) {
-    poemEl.textContent = 'Poem not found';
+    // Saved poem no longer in the data: say so (it can still be removed)
+    poemEl.textContent = 'This poem is no longer in the collection';
+    loadingEl.classList.add('hidden');
+    noteContainer.classList.add('hidden');
+    addNoteBtn.classList.add('hidden');
     document.getElementById('album-art-title').textContent = '';
     document.getElementById('album-art-artist').textContent = '';
     return;
@@ -663,6 +701,7 @@ function renderAlbumDetail() {
 }
 
 function nextInAlbum() {
+  refreshAlbums();
   const album = albums.find(a => a.id === currentAlbumId);
   if (!album || album.artworks.length === 0) return;
   currentAlbumIndex = (currentAlbumIndex + 1) % album.artworks.length;
@@ -670,6 +709,7 @@ function nextInAlbum() {
 }
 
 function prevInAlbum() {
+  refreshAlbums();
   const album = albums.find(a => a.id === currentAlbumId);
   if (!album || album.artworks.length === 0) return;
   currentAlbumIndex = (currentAlbumIndex - 1 + album.artworks.length) % album.artworks.length;
@@ -677,15 +717,15 @@ function prevInAlbum() {
 }
 
 function removeFromCurrentAlbum() {
-  const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
+  const poemId = currentAlbumPoemId;
+  if (!poemId) return;
 
-  album.artworks.splice(currentAlbumIndex, 1);
-  saveAlbums();
-
-  if (currentAlbumIndex >= album.artworks.length) {
-    currentAlbumIndex = Math.max(0, album.artworks.length - 1);
-  }
+  updateAlbums(() => {
+    const album = albums.find(a => a.id === currentAlbumId);
+    if (!album) return;
+    album.artworks = album.artworks.filter(id => id !== poemId);
+    if (album.notes) delete album.notes[poemId];
+  });
   renderAlbumDetail();
 }
 
@@ -702,9 +742,10 @@ function hideEditAlbumsModal() {
 
 function renderEditAlbumsList() {
   const list = document.getElementById('edit-albums-list');
+  refreshAlbums();
   list.innerHTML = albums.map(album => `
-    <div class="edit-album-row" data-album-id="${album.id}">
-      <input type="text" value="${album.name}" placeholder="Collection name" maxlength="12">
+    <div class="edit-album-row" data-album-id="${escapeHtml(album.id)}">
+      <input type="text" value="${escapeHtml(album.name)}" placeholder="Collection name" maxlength="12">
       <button class="delete-album-btn" title="Delete">×</button>
     </div>
   `).join('');
@@ -715,17 +756,21 @@ function renderEditAlbumsList() {
     const deleteBtn = row.querySelector('.delete-album-btn');
 
     input.addEventListener('change', () => {
-      const album = albums.find(a => a.id === albumId);
-      if (album) {
-        album.name = (input.value || 'Untitled').slice(0, 12);
-        saveAlbums();
-      }
+      updateAlbums(() => {
+        const album = albums.find(a => a.id === albumId);
+        if (album) album.name = (input.value || 'Untitled').slice(0, 12);
+      });
     });
 
     deleteBtn.addEventListener('click', () => {
-      if (confirm(`Delete "${albums.find(a => a.id === albumId)?.name}"?`)) {
-        albums = albums.filter(a => a.id !== albumId);
-        saveAlbums();
+      refreshAlbums();
+      const album = albums.find(a => a.id === albumId);
+      if (!album) return renderEditAlbumsList();
+      const n = album.artworks.length;
+      if (confirm(`Delete "${album.name}"${n ? ` and its ${n} saved poem${n !== 1 ? 's' : ''}` : ''}?`)) {
+        updateAlbums(() => {
+          albums = albums.filter(a => a.id !== albumId);
+        });
         renderEditAlbumsList();
       }
     });
@@ -733,13 +778,13 @@ function renderEditAlbumsList() {
 }
 
 function addNewAlbum() {
-  const newAlbum = {
-    id: 'album_' + Date.now(),
-    name: 'New',
-    artworks: []
-  };
-  albums.push(newAlbum);
-  saveAlbums();
+  updateAlbums(() => {
+    albums.push({
+      id: 'album_' + Date.now(),
+      name: 'New',
+      artworks: []
+    });
+  });
   renderEditAlbumsList();
 }
 
@@ -772,7 +817,7 @@ function renderStats() {
         return `
           <div class="artist-row">
             <div class="artist-info">
-              <span class="artist-name">${name}</span>
+              <span class="artist-name">${escapeHtml(name)}</span>
               <span class="artist-count">${stats.seen} / ${stats.total}</span>
             </div>
             <div class="progress-bar">
@@ -797,13 +842,36 @@ function loadSeen() {
   }
 }
 
-function saveSeen() {
+// replace=true writes exactly this set; otherwise merge with what other tabs
+// have stored instead of overwriting it
+function saveSeen(replace = false) {
   try {
+    if (!replace) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) for (const id of JSON.parse(stored)) seen.add(id);
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
-    checkBackupReminder();
   } catch (e) {
     console.error('Failed to save seen data:', e);
   }
+}
+
+// Re-read collections from storage so another tab's saves are never
+// overwritten by this tab's stale in-memory copy
+function refreshAlbums() {
+  try {
+    const data = localStorage.getItem(ALBUMS_KEY);
+    if (data) albums = JSON.parse(data);
+  } catch (e) {
+    console.error('Failed to refresh collections:', e);
+  }
+}
+
+// Every collection change goes through here: fresh read, change, save
+function updateAlbums(fn) {
+  refreshAlbums();
+  fn();
+  saveAlbums();
 }
 
 function loadAlbums() {
@@ -811,8 +879,6 @@ function loadAlbums() {
     const data = localStorage.getItem(ALBUMS_KEY);
     if (data) {
       albums = JSON.parse(data);
-      // Log how many poems are in each collection
-      albums.forEach(a => console.log(`Collection "${a.name}": ${a.artworks.length} poems`));
       console.log(`Loaded ${albums.length} collections from localStorage`);
     } else {
       console.log('No collection data found, using defaults');
@@ -826,19 +892,28 @@ function loadAlbums() {
 }
 
 function saveAlbums() {
+  const data = JSON.stringify(albums);
   try {
-    const data = JSON.stringify(albums);
     localStorage.setItem(ALBUMS_KEY, data);
-    console.log('saveAlbums: Saved', albums.length, 'collections to localStorage');
-    // Verify save worked
-    const verify = localStorage.getItem(ALBUMS_KEY);
-    if (verify !== data) {
-      console.error('saveAlbums: Verification failed! Data mismatch.');
-    }
   } catch (e) {
-    console.error('Failed to save collections:', e);
-    alert('Failed to save! ' + e.message);
+    // Storage full: the read-history is the big, replaceable part. Drop its
+    // oldest half so the collections (irreplaceable) still save.
+    try {
+      const ids = [...seen];
+      seen = new Set(ids.slice(Math.floor(ids.length / 2)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
+      localStorage.setItem(ALBUMS_KEY, data);
+    } catch (e2) {
+      console.error('Failed to save collections:', e2);
+      alert('Failed to save! ' + e2.message + '\nExport a backup from the Progress screen now.');
+      return;
+    }
   }
+  checkBackupReminder();
+}
+
+function countSaved() {
+  return albums.reduce((n, a) => n + a.artworks.length, 0);
 }
 
 // Backup functions
@@ -851,6 +926,7 @@ function loadBackupInfo() {
   } catch (e) {
     console.error('Failed to load backup info:', e);
   }
+  if (backupInfo.savedAtLastBackup == null) backupInfo.savedAtLastBackup = 0;
 }
 
 function saveBackupInfo() {
@@ -861,9 +937,19 @@ function saveBackupInfo() {
   }
 }
 
+// Remind based on saves (the part that can't be recreated), not on reading:
+// after 10 new saves, or once saves have gone 3 days without a backup
+// (phone browsers can wipe site data after ~7 days away)
 function checkBackupReminder() {
-  const newSinceLast = seen.size - backupInfo.seenAtLastBackup;
-  if (newSinceLast >= BACKUP_REMINDER_THRESHOLD) {
+  const now = Date.now();
+  const newSinceLast = countSaved() - backupInfo.savedAtLastBackup;
+  if (newSinceLast <= 0) {
+    if (backupInfo.pendingSince) { backupInfo.pendingSince = null; saveBackupInfo(); }
+    return;
+  }
+  if (!backupInfo.pendingSince) { backupInfo.pendingSince = now; saveBackupInfo(); }
+  if (backupInfo.snoozedUntil && now < backupInfo.snoozedUntil) return;
+  if (newSinceLast >= BACKUP_REMINDER_THRESHOLD || now - backupInfo.pendingSince >= 3 * 86400000) {
     showBackupReminder(newSinceLast);
   }
 }
@@ -878,13 +964,13 @@ function hideBackupReminder() {
 }
 
 function snoozeBackupReminder() {
-  // Snooze - set counter so reminder won't appear for another ~25 poems
-  backupInfo.seenAtLastBackup = seen.size - Math.floor(BACKUP_REMINDER_THRESHOLD / 2);
+  backupInfo.snoozedUntil = Date.now() + 86400000; // ask again tomorrow
   saveBackupInfo();
   hideBackupReminder();
 }
 
-function exportData() {
+async function exportData() {
+  refreshAlbums();
   const data = {
     version: 1,
     type: 'poetry',
@@ -893,44 +979,87 @@ function exportData() {
     albums: albums
   };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `poetry-backup-${new Date().toISOString().split('T')[0]}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const json = JSON.stringify(data, null, 2);
+  const name = `poetry-backup-${new Date().toISOString().split('T')[0]}.json`;
+  const file = new File([json], name, { type: 'application/json' });
+
+  // On phones, use the share sheet so the backup can go to Files / iCloud
+  // Drive / email instead of a downloads folder that's easy to lose
+  const isTouch = 'ontouchstart' in window;
+  if (isTouch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+    } catch (e) {
+      if (e.name === 'AbortError') return; // cancelled: not backed up
+      downloadFile(file);
+    }
+  } else {
+    downloadFile(file);
+  }
 
   backupInfo.lastBackup = new Date().toISOString();
   backupInfo.seenAtLastBackup = seen.size;
+  backupInfo.savedAtLastBackup = countSaved();
+  backupInfo.pendingSince = null;
+  backupInfo.snoozedUntil = null;
   saveBackupInfo();
   updateBackupDisplay();
   hideBackupReminder();
 }
 
+function downloadFile(file) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Import MERGES into what's here and never removes anything, so restoring
+// an older backup can't erase newer saves
 function importData(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
+      if (data.type !== 'poetry') {
+        alert('That isn’t a poetry backup (art backups go in the art section).');
+        return;
+      }
+      let added = 0;
 
       if (data.seen && Array.isArray(data.seen)) {
-        seen = new Set(data.seen);
+        for (const id of data.seen) seen.add(id);
         saveSeen();
       }
 
       if (data.albums && Array.isArray(data.albums)) {
-        albums = data.albums;
-        saveAlbums();
+        updateAlbums(() => {
+          for (const inc of data.albums) {
+            if (!inc || !inc.id || !Array.isArray(inc.artworks)) continue;
+            let album = albums.find(a => a.id === inc.id);
+            if (!album) {
+              album = { id: inc.id, name: inc.name || 'Untitled', artworks: [] };
+              albums.push(album);
+            }
+            for (const id of inc.artworks) {
+              if (!album.artworks.includes(id)) {
+                album.artworks.push(id);
+                added++;
+              }
+            }
+            for (const [id, note] of Object.entries(inc.notes || {})) {
+              if (!album.notes) album.notes = {};
+              if (!album.notes[id]) album.notes[id] = note;
+            }
+          }
+        });
       }
 
-      backupInfo.lastBackup = new Date().toISOString();
-      backupInfo.seenAtLastBackup = seen.size;
-      saveBackupInfo();
-
-      alert(`Imported successfully!\n- ${seen.size} poems read\n- ${albums.length} collections`);
+      alert(`Imported!\n- ${added} poem${added !== 1 ? 's' : ''} added to collections\n- ${seen.size} poems read\nNothing already saved was removed.`);
 
       applySort();
       showCurrentPoem();
@@ -946,10 +1075,10 @@ function importData(file) {
 
 function updateBackupDisplay() {
   const textEl = document.getElementById('last-backup-text');
+  const unsaved = Math.max(0, countSaved() - backupInfo.savedAtLastBackup);
   if (backupInfo.lastBackup) {
     const date = new Date(backupInfo.lastBackup);
-    const newSince = seen.size - backupInfo.seenAtLastBackup;
-    textEl.textContent = `Last backup: ${date.toLocaleDateString()} (${newSince} new since then)`;
+    textEl.textContent = `Last backup: ${date.toLocaleDateString()} (${unsaved} saved since then)`;
   } else {
     textEl.textContent = 'No backup yet - export your data to keep it safe!';
   }
@@ -971,11 +1100,7 @@ function setupBackupControls() {
   });
 
   document.getElementById('close-backup-reminder').addEventListener('click', hideBackupReminder);
-  document.getElementById('reminder-later-btn').addEventListener('click', () => {
-    backupInfo.seenAtLastBackup = seen.size - Math.floor(BACKUP_REMINDER_THRESHOLD / 2);
-    saveBackupInfo();
-    hideBackupReminder();
-  });
+  document.getElementById('reminder-later-btn').addEventListener('click', snoozeBackupReminder);
 
   // Close backup reminder on backdrop click
   document.getElementById('backup-reminder').addEventListener('click', (e) => {
