@@ -391,6 +391,19 @@ function getCurrentPainting() {
 function setupControls() {
   // Keyboard
   document.addEventListener('keydown', (e) => {
+    // Typing in a text box (note, album name, API key) must never trigger
+    // shortcuts: space/arrows/Backspace/'s' would navigate away mid-typing
+    const t = e.target;
+    const typing = t && (t.tagName === 'TEXTAREA' || t.isContentEditable ||
+      (t.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'file'].includes(t.type)));
+    if (typing) return;
+    if (t && t.type === 'checkbox' && e.key === ' ') return; // Space ticks the box
+    // With a popup open, Escape closes it and nothing else happens underneath
+    const openModal = document.querySelector('.modal:not(.hidden)');
+    if (openModal) {
+      if (e.key === 'Escape') openModal.classList.add('hidden');
+      return;
+    }
     if (albumDetailView.classList.contains('active')) {
       if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
@@ -488,7 +501,7 @@ function setupControls() {
   // Reset
   resetBtn.addEventListener('click', () => {
     seen.clear();
-    saveSeen();
+    saveSeen(true);
     applySort();
     showCurrentArtwork();
   });
@@ -629,6 +642,7 @@ function debounce(fn, delay) {
 
 // View switching
 function showView(viewEl) {
+  savePanel.classList.add('hidden');
   [galleryView, statsView, albumsView, albumDetailView].forEach(v => v.classList.remove('active'));
   viewEl.classList.add('active');
 }
@@ -759,6 +773,7 @@ function renderAlbumDetail() {
     loadingEl.classList.add('hidden');
   };
   img.onerror = () => {
+    if (currentAlbumArtworkId !== artworkId) return;
     loadingEl.textContent = 'Failed to load';
   };
   img.src = imageUrl;
@@ -890,7 +905,7 @@ function renderStats() {
         return `
           <div class="artist-row">
             <div class="artist-info">
-              <span class="artist-name">${name}</span>
+              <span class="artist-name">${escapeHtml(name)}</span>
               <span class="artist-count">${stats.seen} / ${stats.total}</span>
             </div>
             <div class="progress-bar">
@@ -922,7 +937,7 @@ function loadSeen() {
       }
 
       if (migrated) {
-        saveSeen();
+        saveSeen(true);
       }
 
       console.log(`Loaded ${seen.size} seen artworks`);
@@ -932,11 +947,14 @@ function loadSeen() {
   }
 }
 
-function saveSeen() {
+// replace=true writes exactly this set (Start Over, migrations); otherwise
+// merge with what other tabs have stored instead of overwriting it
+function saveSeen(replace = false) {
   try {
-    // Merge with what other tabs have stored instead of overwriting it
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) for (const id of JSON.parse(stored)) seen.add(id);
+    if (!replace) {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) for (const id of JSON.parse(stored)) seen.add(id);
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
   } catch (e) {
     console.error('Failed to save seen data:', e);
@@ -979,14 +997,24 @@ function loadAlbums() {
 }
 
 function saveAlbums() {
+  const data = JSON.stringify(albums);
   try {
-    const data = JSON.stringify(albums);
     localStorage.setItem(ALBUMS_KEY, data);
-    checkBackupReminder();
   } catch (e) {
-    console.error('Failed to save albums:', e);
-    alert('Failed to save! ' + e.message);
+    // Storage full: the seen-history is the big, replaceable part. Drop its
+    // oldest half so the albums (irreplaceable) still save.
+    try {
+      const ids = [...seen];
+      seen = new Set(ids.slice(Math.floor(ids.length / 2)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
+      localStorage.setItem(ALBUMS_KEY, data);
+    } catch (e2) {
+      console.error('Failed to save albums:', e2);
+      alert('Failed to save! ' + e2.message + '\nExport a backup from the Progress screen now.');
+      return;
+    }
   }
+  checkBackupReminder();
 }
 
 function countSaved() {
@@ -1199,7 +1227,7 @@ function setupAIControls() {
 
   aiBtn.addEventListener('click', () => requestInterpretation());
 
-  closeAiModal.addEventListener('click', () => aiModal.classList.add('hidden'));
+  closeAiModal.addEventListener('click', () => { aiModal.classList.add('hidden'); stopBreathing(); });
   closeApiModal.addEventListener('click', () => apiKeyModal.classList.add('hidden'));
 
   saveApiKeyBtn.addEventListener('click', () => {
@@ -1217,32 +1245,41 @@ function setupAIControls() {
 
   // Close modals on backdrop click
   aiModal.addEventListener('click', (e) => {
-    if (e.target === aiModal) aiModal.classList.add('hidden');
+    if (e.target === aiModal) { aiModal.classList.add('hidden'); stopBreathing(); }
   });
   apiKeyModal.addEventListener('click', (e) => {
     if (e.target === apiKeyModal) apiKeyModal.classList.add('hidden');
   });
 }
 
-// Convert image URL to base64
+// Convert image URL to base64 JPEG, scaled down so huge originals stay under
+// the API's per-image size limit (and cost less) - 1568px is plenty to read a painting
+const AI_MAX_EDGE = 1568;
 async function imageToBase64(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      const scale = Math.min(1, AI_MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
       const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       // Get base64 without the data:image/jpeg;base64, prefix
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      const base64 = dataUrl.split(',')[1];
-      resolve(base64);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      resolve(dataUrl.split(',')[1]);
     };
     img.onerror = () => reject(new Error('Failed to load image'));
     img.src = url;
   });
+}
+
+let aiRequestId = 0;
+
+function stopBreathing() {
+  if (window.breathInterval) clearInterval(window.breathInterval);
+  window.breathInterval = null;
 }
 
 async function requestInterpretation() {
@@ -1255,6 +1292,7 @@ async function requestInterpretation() {
 
   const painting = getCurrentPainting();
   if (!painting) return;
+  const requestId = ++aiRequestId;
 
   const aiModal = document.getElementById('ai-modal');
   const aiTitle = document.getElementById('ai-modal-title');
@@ -1272,17 +1310,23 @@ async function requestInterpretation() {
   // Cycle through calming messages
   const breathMessages = ['breathe in', 'breathe out', 'relax', 'enjoy your day'];
   let msgIndex = 0;
-  const breathInterval = setInterval(() => {
+  stopBreathing();
+  window.breathInterval = setInterval(() => {
     msgIndex = (msgIndex + 1) % breathMessages.length;
     const textEl = aiLoading.querySelector('.breath-text');
     if (textEl) textEl.textContent = breathMessages[msgIndex];
   }, 3000);
 
-  // Store interval to clear later
-  window.breathInterval = breathInterval;
-
   // Disable button while loading
   document.getElementById('ai-btn').disabled = true;
+
+  // Only the latest request may write into the modal
+  const show = (text) => {
+    if (requestId !== aiRequestId) return;
+    stopBreathing();
+    aiLoading.innerHTML = '';
+    aiText.textContent = text;
+  };
 
   try {
     const imageUrl = cleanImageUrl(painting.image);
@@ -1296,11 +1340,14 @@ async function requestInterpretation() {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'server-side-fallback-2026-07-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        model: 'claude-opus-5-5',
+        max_tokens: 16000,
+        output_config: { effort: 'low' },
+        fallbacks: 'default',
         messages: [{
           role: 'user',
           content: [
@@ -1327,30 +1374,44 @@ ${AI_PROMPT}`
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'API request failed');
+      let message = `Request failed (${response.status})`;
+      try {
+        const error = await response.json();
+        if (error.error && error.error.message) message = error.error.message;
+      } catch (_) {}
+      if (response.status === 401) {
+        localStorage.removeItem(API_KEY_STORAGE);
+        show('Invalid API key. Tap the button again to enter a new one.');
+      } else if (response.status === 429 || response.status >= 500) {
+        show('Claude is busy right now. Please try again in a moment.');
+      } else {
+        show(`Error: ${message}`);
+      }
+      return;
     }
 
     const data = await response.json();
-    if (window.breathInterval) clearInterval(window.breathInterval);
-    aiLoading.innerHTML = '';
-    aiText.textContent = data.content[0].text;
+    if (data.stop_reason === 'refusal') {
+      show('Claude couldn\u2019t write about this one. Try another painting.');
+      return;
+    }
+    // The reply can include non-text blocks (e.g. thinking); keep only the text
+    const text = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n\n')
+      .trim();
+    show(text || 'No interpretation came back. Please try again.');
 
   } catch (error) {
     console.error('AI request failed:', error);
-    if (window.breathInterval) clearInterval(window.breathInterval);
-    aiLoading.innerHTML = '';
-
-    if (error.message.includes('invalid x-api-key') || error.message.includes('401')) {
-      aiText.textContent = 'Invalid API key. Please check your key and try again.';
-      localStorage.removeItem(API_KEY_STORAGE);
-    } else if (error.message.includes('CORS') || error.name === 'TypeError') {
-      aiText.textContent = 'Unable to connect to Claude API. This may be a browser restriction.\n\nTry using the app in a different browser or contact support.';
+    if (error.message === 'Failed to load image') {
+      show('Couldn\u2019t load this painting\u2019s image to send. Check your connection and try again.');
     } else {
-      aiText.textContent = `Error: ${error.message}`;
+      show('Unable to reach Claude. Check your connection and try again.');
     }
   } finally {
-    document.getElementById('ai-btn').disabled = false;
+    if (requestId === aiRequestId) document.getElementById('ai-btn').disabled = false;
   }
 }
 
