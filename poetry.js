@@ -5,8 +5,7 @@ const ALBUMS_KEY = 'poetry_albums';
 const BACKUP_KEY = 'poetry_backup_info';
 const BACKUP_REMINDER_THRESHOLD = 10; // Remind after 10 new saves
 
-// Local poetry data (13,854 poems from Poetry Foundation)
-const POEMS_DATA_URL = 'poems-data.json';
+// Poetry Foundation data (13,854 poems), served in pieces from data/shards/
 const TOTAL_POEMS = 13854;
 
 let poems = [];
@@ -191,38 +190,81 @@ function cleanPoemContent(content) {
   return trimmedLines.join('\n');
 }
 
-// Load poems from local JSON file
+// Load poems in small pieces: show the first poem as soon as ONE piece
+// arrives, then fill in the rest in the background
+const SHARDS_DIR = './data/shards/';
+let allLoaded = false;
+
+async function fetchJSON(url, tries = 3) {
+  for (let i = 1; ; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(res.status);
+      return await res.json();
+    } catch (e) {
+      if (i >= tries) throw e;
+      await new Promise(r => setTimeout(r, 1000 * i));
+    }
+  }
+}
+
+function addPoems(data) {
+  const added = [];
+  for (const item of data) {
+    const poem = {
+      title: fixEncoding((item.title || 'Untitled').trim()),
+      author: fixEncoding((item.author || 'Unknown').trim()),
+      content: cleanPoemContent(item.content)
+    };
+    const id = getPoemId(poem);
+    if (!poemsMap[id]) {
+      poems.push(poem);
+      poemsMap[id] = poem;
+      added.push(poem);
+    }
+  }
+  return added;
+}
+
 async function loadPoems() {
   try {
     loadingEl.textContent = 'Loading poems...';
-
-    const response = await fetch(POEMS_DATA_URL);
-    const data = await response.json();
-
-    // Transform and dedupe poems
     poems = [];
     poemsMap = {};
-
-    for (const item of data) {
-      const poem = {
-        title: fixEncoding((item.title || 'Untitled').trim()),
-        author: fixEncoding((item.author || 'Unknown').trim()),
-        content: cleanPoemContent(item.content)
-      };
-
-      const id = getPoemId(poem);
-      if (!poemsMap[id]) {
-        poems.push(poem);
-        poemsMap[id] = poem;
-      }
-    }
-
-    console.log(`Loaded ${poems.length} poems`);
+    const manifest = await fetchJSON(SHARDS_DIR + 'manifest.json');
+    const order = shuffle([...Array(manifest.poems.pieces).keys()]);
+    addPoems(await fetchJSON(SHARDS_DIR + 'poems-' + order[0] + '.json'));
+    console.log('First piece: ' + poems.length + ' poems');
     loadingEl.textContent = '';
+    loadRestInBackground(order.slice(1));
   } catch (e) {
     console.error('Failed to load poems:', e);
     loadingEl.textContent = 'Failed to load poems. Please refresh.';
   }
+}
+
+async function loadRestInBackground(pieces) {
+  const queue = [...pieces];
+  let failed = false;
+  const worker = async () => {
+    while (queue.length) {
+      const n = queue.shift();
+      try {
+        const added = addPoems(await fetchJSON(SHARDS_DIR + 'poems-' + n + '.json'));
+        // Mix the new arrivals into what's still ahead (never what you've read)
+        const ahead = orderedList.slice(currentIndex + 1);
+        orderedList = [...orderedList.slice(0, currentIndex + 1), ...shuffle([...ahead, ...added])];
+      } catch (e) {
+        console.error('Failed to load piece', n, e);
+        failed = true;
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  allLoaded = !failed;
+  console.log('Loaded ' + poems.length + ' poems');
+  if (albumDetailView.classList.contains('active')) renderAlbumDetail();
+  if (statsView.classList.contains('active')) renderStats();
 }
 
 // All poems are loaded from local file, so this just reshuffles when needed
@@ -690,7 +732,7 @@ function renderAlbumDetail() {
 
   if (!poem) {
     // Saved poem no longer in the data: say so (it can still be removed)
-    poemEl.textContent = 'This poem is no longer in the collection';
+    poemEl.textContent = allLoaded ? 'This poem is no longer in the collection' : 'Loading\u2026';
     loadingEl.classList.add('hidden');
     noteContainer.classList.add('hidden');
     addNoteBtn.classList.add('hidden');

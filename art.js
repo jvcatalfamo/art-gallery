@@ -3,7 +3,7 @@
 const STORAGE_KEY = 'artgallery_seen';
 const ALBUMS_KEY = 'artgallery_albums';
 const BACKUP_KEY = 'artgallery_backup_info';
-const DATA_FILE = './data/paintings.json';
+const SHARDS_DIR = './data/shards/';
 const BACKUP_REMINDER_THRESHOLD = 10; // Remind after 10 new saves
 const API_KEY_STORAGE = 'artgallery_apikey';
 
@@ -17,6 +17,8 @@ Then naturally flow into the deeper context: Why did the artist paint this? What
 Write it as a cohesive narrative, not separate sections. Be engaging and insightful. Keep it to 3-4 paragraphs.`;
 
 let paintings = [];
+let totalPaintings = 0;
+let allLoaded = false; // the full collection arrives in pieces after the first
 let paintingsMap = {};
 let orderedList = [];
 let currentIndex = 0;
@@ -99,20 +101,76 @@ async function init() {
   });
 }
 
-// Load paintings data
+// Load paintings in small pieces: show the first painting as soon as ONE
+// piece arrives (instead of waiting minutes for the whole 220k list), then
+// fill in the rest in the background
+function unpackPainting(row) {
+  const img = row[0][0] === '~' ? 'https://uploads' + row[0].slice(1) + '!Large.jpg' : row[0];
+  return { image: img, title: row[1], artistName: row[2], completitionYear: row[3], contentId: row[4] };
+}
+
+async function fetchJSON(url, tries = 3) {
+  for (let i = 1; ; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(res.status);
+      return await res.json();
+    } catch (e) {
+      if (i >= tries) throw e;
+      await new Promise(r => setTimeout(r, 1000 * i));
+    }
+  }
+}
+
+function addPaintings(rows) {
+  const added = [];
+  for (const row of rows) {
+    const p = unpackPainting(row);
+    paintings.push(p);
+    paintingsMap[getPaintingId(p)] = p;
+    added.push(p);
+  }
+  return added;
+}
+
 async function loadPaintings() {
   try {
-    const response = await fetch(DATA_FILE);
-    paintings = await response.json();
-    paintingsMap = {};
-    for (const p of paintings) {
-      paintingsMap[getPaintingId(p)] = p;
-    }
-    console.log(`Loaded ${paintings.length} paintings`);
+    const manifest = await fetchJSON(SHARDS_DIR + 'manifest.json');
+    totalPaintings = manifest.art.count;
+    const order = shuffle([...Array(manifest.art.pieces).keys()]);
+    addPaintings(await fetchJSON(SHARDS_DIR + 'art-' + order[0] + '.json'));
+    console.log('First piece: ' + paintings.length + ' paintings');
+    loadRestInBackground(order.slice(1));
   } catch (e) {
     console.error('Failed to load paintings:', e);
-    loadingEl.textContent = 'Failed to load data';
+    loadingEl.textContent = 'Failed to load paintings — check your connection and refresh';
   }
+}
+
+async function loadRestInBackground(pieces) {
+  const queue = [...pieces];
+  let failed = false;
+  const worker = async () => {
+    while (queue.length) {
+      const n = queue.shift();
+      try {
+        const added = addPaintings(await fetchJSON(SHARDS_DIR + 'art-' + n + '.json'));
+        // Mix the new arrivals into what's still ahead (never what you've passed)
+        const ahead = orderedList.slice(currentIndex + 1 + 3); // keep the 3 preloaded next
+        orderedList = [...orderedList.slice(0, currentIndex + 1 + 3), ...shuffle([...ahead, ...added])];
+      } catch (e) {
+        console.error('Failed to load piece', n, e);
+        failed = true;
+      }
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  allLoaded = !failed;
+  console.log('Loaded ' + paintings.length + ' paintings');
+  // Screens that needed the full list (saved paintings, stats) can fill in now
+  if (albumsView.classList.contains('active')) renderAlbumsList();
+  if (albumDetailView.classList.contains('active')) renderAlbumDetail();
+  if (statsView.classList.contains('active')) renderStats();
 }
 
 // Sorting - always random
@@ -754,10 +812,10 @@ function renderAlbumDetail() {
   const artworkId = currentAlbumArtworkId;
   const painting = paintingsMap[artworkId];
   if (!painting) {
-    // Saved painting no longer in the collection: say so instead of leaving
-    // the previous painting on screen (it can still be removed)
+    // Not loaded yet (the collection arrives in pieces), or truly gone: say so
+    // instead of leaving the previous painting on screen (it can still be removed)
     artworkEl.classList.remove('loaded');
-    loadingEl.textContent = 'This painting is no longer in the collection';
+    loadingEl.textContent = allLoaded ? 'This painting is no longer in the collection' : 'Loading…';
     loadingEl.classList.remove('hidden');
     noteContainer.classList.add('hidden');
     addNoteBtn.classList.add('hidden');
@@ -895,7 +953,7 @@ function addNewAlbum() {
 
 // Render stats
 function renderStats() {
-  const total = paintings.length;
+  const total = totalPaintings || paintings.length;
   const seenCount = seen.size;
   const percent = total > 0 ? (seenCount / total * 100).toFixed(1) : 0;
 
