@@ -4,7 +4,7 @@ const STORAGE_KEY = 'artgallery_seen';
 const ALBUMS_KEY = 'artgallery_albums';
 const BACKUP_KEY = 'artgallery_backup_info';
 const DATA_FILE = './data/paintings.json';
-const BACKUP_REMINDER_THRESHOLD = 50; // Remind after 50 new artworks
+const BACKUP_REMINDER_THRESHOLD = 10; // Remind after 10 new saves
 const API_KEY_STORAGE = 'artgallery_apikey';
 
 // AI prompt - combines literal description with deeper meaning
@@ -28,12 +28,20 @@ let albums = [];
 // Backup tracking
 let backupInfo = {
   lastBackup: null,
-  seenAtLastBackup: 0
+  seenAtLastBackup: 0,
+  savedAtLastBackup: 0
 };
 
 // Current album viewing state
 let currentAlbumId = null;
 let currentAlbumIndex = 0;
+let currentAlbumArtworkId = null; // the artwork actually on screen in album view
+
+let consecutiveFailures = 0;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // Default albums
 const DEFAULT_ALBUMS = [
@@ -64,14 +72,17 @@ const albumCheckboxes = document.getElementById('album-checkboxes');
 
 // Initialize
 async function init() {
+  loadBackupInfo();
   loadSeen();
   loadAlbums();
-  loadBackupInfo();
   await loadPaintings();
   applySort();
   showCurrentArtwork();
   setupControls();
   setupBackupControls();
+  checkBackupReminder();
+  // Ask the browser not to evict our data (helps on Android/Chrome; harmless elsewhere)
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 }
 
 // Load paintings data
@@ -297,8 +308,8 @@ function showCurrentArtwork() {
   const painting = orderedList[currentIndex];
   if (!painting) return;
 
-  seen.add(getPaintingId(painting));
-  saveSeen();
+  // The save panel belongs to one painting; never leave it open on another
+  savePanel.classList.add('hidden');
 
   loadingEl.textContent = 'Loading...';
   loadingEl.classList.remove('hidden');
@@ -307,13 +318,25 @@ function showCurrentArtwork() {
   const imageUrl = cleanImageUrl(painting.image);
   const img = new Image();
   img.onload = () => {
+    if (getCurrentPainting() !== painting) return; // user already moved on
+    consecutiveFailures = 0;
+    // Only count it as seen once it actually showed up
+    seen.add(getPaintingId(painting));
+    saveSeen();
     artworkImg.src = imageUrl;
     artworkImg.classList.add('loaded');
     loadingEl.classList.add('hidden');
     preloadNext();
   };
   img.onerror = () => {
+    if (getCurrentPainting() !== painting) return;
     console.warn('Failed to load:', imageUrl);
+    consecutiveFailures++;
+    // Offline or images blocked: stop instead of racing through the collection
+    if (!navigator.onLine || consecutiveFailures >= 5) {
+      loadingEl.textContent = 'Can’t load images right now — tap to retry';
+      return;
+    }
     setTimeout(next, 100);
   };
   img.src = imageUrl;
@@ -445,6 +468,23 @@ function setupControls() {
   // Only use click - it fires on both desktop and mobile (after touch)
   document.addEventListener('click', closeSavePanelOnOutsideClick, true);
 
+  // Retry after images failed to load
+  loadingEl.addEventListener('click', () => {
+    if (consecutiveFailures === 0) return;
+    consecutiveFailures = 0;
+    showCurrentArtwork();
+  });
+
+  // Another tab changed the albums: pick that up so we never write back stale data
+  window.addEventListener('storage', (e) => {
+    if (e.key === ALBUMS_KEY) {
+      refreshAlbums();
+      if (albumsView.classList.contains('active')) renderAlbumsList();
+      if (albumDetailView.classList.contains('active')) renderAlbumDetail();
+      if (!savePanel.classList.contains('hidden')) renderAlbumCheckboxes();
+    }
+  });
+
   // Reset
   resetBtn.addEventListener('click', () => {
     seen.clear();
@@ -477,10 +517,11 @@ function setupControls() {
 
 // Note modal functions
 function openNoteModal() {
+  refreshAlbums();
   const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
+  const artworkId = currentAlbumArtworkId;
+  if (!album || !artworkId) return;
 
-  const artworkId = album.artworks[currentAlbumIndex];
   const currentNote = album.notes && album.notes[artworkId] || '';
 
   document.getElementById('edit-note-input').value = currentNote;
@@ -491,39 +532,31 @@ function closeNoteModal() {
   document.getElementById('edit-note-modal').classList.add('hidden');
 }
 
-function saveNoteFromModal() {
-  const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
-
-  const artworkId = album.artworks[currentAlbumIndex];
-  const note = document.getElementById('edit-note-input').value.trim();
-
-  if (!album.notes) album.notes = {};
-
-  if (note) {
-    album.notes[artworkId] = note;
-  } else {
-    delete album.notes[artworkId];
-  }
-
-  saveAlbums();
+// Notes are keyed by the artwork on screen, not by index, so a change made
+// in another tab can't shift the note onto a different painting
+function setNoteForCurrent(note) {
+  const artworkId = currentAlbumArtworkId;
+  if (!artworkId) return;
+  updateAlbums(() => {
+    const album = albums.find(a => a.id === currentAlbumId);
+    if (!album || !album.artworks.includes(artworkId)) return;
+    if (!album.notes) album.notes = {};
+    if (note) {
+      album.notes[artworkId] = note;
+    } else {
+      delete album.notes[artworkId];
+    }
+  });
   closeNoteModal();
   renderAlbumDetail();
 }
 
+function saveNoteFromModal() {
+  setNoteForCurrent(document.getElementById('edit-note-input').value.trim());
+}
+
 function deleteNoteFromModal() {
-  const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
-
-  const artworkId = album.artworks[currentAlbumIndex];
-
-  if (album.notes) {
-    delete album.notes[artworkId];
-  }
-
-  saveAlbums();
-  closeNoteModal();
-  renderAlbumDetail();
+  setNoteForCurrent('');
 }
 
 // Album checkboxes in save panel
@@ -533,12 +566,13 @@ function renderAlbumCheckboxes() {
 
   const paintingId = getPaintingId(painting);
 
+  refreshAlbums();
   albumCheckboxes.innerHTML = albums.map(album => {
     const isIn = album.artworks.includes(paintingId);
     return `
       <label>
-        <input type="checkbox" data-album-id="${album.id}" ${isIn ? 'checked' : ''}>
-        ${album.name}
+        <input type="checkbox" data-album-id="${escapeHtml(album.id)}" ${isIn ? 'checked' : ''}>
+        ${escapeHtml(album.name)}
       </label>
     `;
   }).join('');
@@ -546,27 +580,24 @@ function renderAlbumCheckboxes() {
   // Handle checkbox changes
   function handleCheckboxToggle(cb) {
     const albumId = cb.dataset.albumId;
-    const album = albums.find(a => a.id === albumId);
-    if (!album) {
-      console.error('Album not found:', albumId);
-      return;
-    }
-
-    if (cb.checked) {
-      if (!album.artworks.includes(paintingId)) {
-        album.artworks.push(paintingId);
-        console.log('Added to album:', album.name, 'paintingId:', paintingId);
+    updateAlbums(() => {
+      const album = albums.find(a => a.id === albumId);
+      if (!album) {
+        console.error('Album not found:', albumId);
+        return;
       }
-    } else {
-      album.artworks = album.artworks.filter(id => id !== paintingId);
-      if (album.notes) {
-        delete album.notes[paintingId];
-      }
-      console.log('Removed from album:', album.name);
-    }
 
-    saveAlbums();
-    console.log('Albums saved. Total in', album.name + ':', album.artworks.length);
+      if (cb.checked) {
+        if (!album.artworks.includes(paintingId)) {
+          album.artworks.push(paintingId);
+        }
+      } else {
+        album.artworks = album.artworks.filter(id => id !== paintingId);
+        if (album.notes) {
+          delete album.notes[paintingId];
+        }
+      }
+    });
   }
 
   albumCheckboxes.querySelectorAll('input').forEach(cb => {
@@ -627,18 +658,19 @@ function showAlbumDetail(albumId) {
 // Albums list
 function renderAlbumsList() {
   const list = document.getElementById('albums-list');
+  refreshAlbums();
   list.innerHTML = albums.map(album => {
     const count = album.artworks.length;
     const firstArtwork = count > 0 ? paintingsMap[album.artworks[0]] : null;
     const thumbUrl = firstArtwork ? cleanImageUrl(firstArtwork.image) : '';
 
     return `
-      <div class="album-item" data-album-id="${album.id}">
+      <div class="album-item" data-album-id="${escapeHtml(album.id)}">
         <div class="album-icon">
-          ${thumbUrl ? `<img src="${thumbUrl}" alt="">` : ''}
+          ${thumbUrl ? `<img src="${escapeHtml(thumbUrl)}" alt="">` : ''}
         </div>
         <div class="album-info">
-          <div class="album-name">${album.name}</div>
+          <div class="album-name">${escapeHtml(album.name)}</div>
           <div class="album-count">${count} artwork${count !== 1 ? 's' : ''}</div>
         </div>
       </div>
@@ -656,6 +688,12 @@ function renderAlbumsList() {
 function renderAlbumDetail() {
   const album = albums.find(a => a.id === currentAlbumId);
   if (!album) return;
+
+  // Another tab may have shrunk this album
+  if (currentAlbumIndex >= album.artworks.length) {
+    currentAlbumIndex = Math.max(0, album.artworks.length - 1);
+  }
+  currentAlbumArtworkId = album.artworks[currentAlbumIndex] || null;
 
   document.getElementById('album-detail-title').textContent = album.name;
   document.getElementById('album-detail-count').textContent =
@@ -681,9 +719,21 @@ function renderAlbumDetail() {
   }
 
   emptyEl.classList.add('hidden');
-  const artworkId = album.artworks[currentAlbumIndex];
+  const artworkId = currentAlbumArtworkId;
   const painting = paintingsMap[artworkId];
-  if (!painting) return;
+  if (!painting) {
+    // Saved painting no longer in the collection: say so instead of leaving
+    // the previous painting on screen (it can still be removed)
+    artworkEl.classList.remove('loaded');
+    loadingEl.textContent = 'This painting is no longer in the collection';
+    loadingEl.classList.remove('hidden');
+    noteContainer.classList.add('hidden');
+    addNoteBtn.classList.add('hidden');
+    document.getElementById('album-art-title').textContent = '';
+    document.getElementById('album-art-artist').textContent = '';
+    document.getElementById('album-art-year').textContent = '';
+    return;
+  }
 
   // Show/hide note
   const note = album.notes && album.notes[artworkId];
@@ -696,12 +746,14 @@ function renderAlbumDetail() {
     addNoteBtn.classList.remove('hidden');
   }
 
+  loadingEl.textContent = 'Loading...';
   loadingEl.classList.remove('hidden');
   artworkEl.classList.remove('loaded');
 
   const imageUrl = cleanImageUrl(painting.image);
   const img = new Image();
   img.onload = () => {
+    if (currentAlbumArtworkId !== artworkId) return; // user already moved on
     artworkEl.src = imageUrl;
     artworkEl.classList.add('loaded');
     loadingEl.classList.add('hidden');
@@ -719,6 +771,7 @@ function renderAlbumDetail() {
 }
 
 function nextInAlbum() {
+  refreshAlbums();
   resetZoom();
   const album = albums.find(a => a.id === currentAlbumId);
   if (!album || album.artworks.length === 0) return;
@@ -727,6 +780,7 @@ function nextInAlbum() {
 }
 
 function prevInAlbum() {
+  refreshAlbums();
   resetZoom();
   const album = albums.find(a => a.id === currentAlbumId);
   if (!album || album.artworks.length === 0) return;
@@ -735,15 +789,15 @@ function prevInAlbum() {
 }
 
 function removeFromCurrentAlbum() {
-  const album = albums.find(a => a.id === currentAlbumId);
-  if (!album || album.artworks.length === 0) return;
+  const artworkId = currentAlbumArtworkId;
+  if (!artworkId) return;
 
-  album.artworks.splice(currentAlbumIndex, 1);
-  saveAlbums();
-
-  if (currentAlbumIndex >= album.artworks.length) {
-    currentAlbumIndex = Math.max(0, album.artworks.length - 1);
-  }
+  updateAlbums(() => {
+    const album = albums.find(a => a.id === currentAlbumId);
+    if (!album) return;
+    album.artworks = album.artworks.filter(id => id !== artworkId);
+    if (album.notes) delete album.notes[artworkId];
+  });
   renderAlbumDetail();
 }
 
@@ -760,9 +814,10 @@ function hideEditAlbumsModal() {
 
 function renderEditAlbumsList() {
   const list = document.getElementById('edit-albums-list');
+  refreshAlbums();
   list.innerHTML = albums.map(album => `
-    <div class="edit-album-row" data-album-id="${album.id}">
-      <input type="text" value="${album.name}" placeholder="Album name" maxlength="12">
+    <div class="edit-album-row" data-album-id="${escapeHtml(album.id)}">
+      <input type="text" value="${escapeHtml(album.name)}" placeholder="Album name" maxlength="12">
       <button class="delete-album-btn" title="Delete">×</button>
     </div>
   `).join('');
@@ -773,17 +828,21 @@ function renderEditAlbumsList() {
     const deleteBtn = row.querySelector('.delete-album-btn');
 
     input.addEventListener('change', () => {
-      const album = albums.find(a => a.id === albumId);
-      if (album) {
-        album.name = (input.value || 'Untitled').slice(0, 12);
-        saveAlbums();
-      }
+      updateAlbums(() => {
+        const album = albums.find(a => a.id === albumId);
+        if (album) album.name = (input.value || 'Untitled').slice(0, 12);
+      });
     });
 
     deleteBtn.addEventListener('click', () => {
-      if (confirm(`Delete "${albums.find(a => a.id === albumId)?.name}"?`)) {
-        albums = albums.filter(a => a.id !== albumId);
-        saveAlbums();
+      refreshAlbums();
+      const album = albums.find(a => a.id === albumId);
+      if (!album) return renderEditAlbumsList();
+      const n = album.artworks.length;
+      if (confirm(`Delete "${album.name}"${n ? ` and its ${n} saved artwork${n !== 1 ? 's' : ''}` : ''}?`)) {
+        updateAlbums(() => {
+          albums = albums.filter(a => a.id !== albumId);
+        });
         renderEditAlbumsList();
       }
     });
@@ -791,13 +850,13 @@ function renderEditAlbumsList() {
 }
 
 function addNewAlbum() {
-  const newAlbum = {
-    id: 'album_' + Date.now(),
-    name: 'New',
-    artworks: []
-  };
-  albums.push(newAlbum);
-  saveAlbums();
+  updateAlbums(() => {
+    albums.push({
+      id: 'album_' + Date.now(),
+      name: 'New',
+      artworks: []
+    });
+  });
   renderEditAlbumsList();
 }
 
@@ -875,11 +934,31 @@ function loadSeen() {
 
 function saveSeen() {
   try {
+    // Merge with what other tabs have stored instead of overwriting it
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) for (const id of JSON.parse(stored)) seen.add(id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
-    checkBackupReminder();
   } catch (e) {
     console.error('Failed to save seen data:', e);
   }
+}
+
+// Re-read albums from storage so another tab's saves are never overwritten
+// by this tab's stale in-memory copy
+function refreshAlbums() {
+  try {
+    const data = localStorage.getItem(ALBUMS_KEY);
+    if (data) albums = JSON.parse(data);
+  } catch (e) {
+    console.error('Failed to refresh albums:', e);
+  }
+}
+
+// Every album change goes through here: fresh read, change, save
+function updateAlbums(fn) {
+  refreshAlbums();
+  fn();
+  saveAlbums();
 }
 
 function loadAlbums() {
@@ -887,8 +966,6 @@ function loadAlbums() {
     const data = localStorage.getItem(ALBUMS_KEY);
     if (data) {
       albums = JSON.parse(data);
-      // Log how many artworks are in each album
-      albums.forEach(a => console.log(`Album "${a.name}": ${a.artworks.length} artworks`));
       console.log(`Loaded ${albums.length} albums from localStorage`);
     } else {
       console.log('No album data found, using defaults');
@@ -905,16 +982,15 @@ function saveAlbums() {
   try {
     const data = JSON.stringify(albums);
     localStorage.setItem(ALBUMS_KEY, data);
-    console.log('saveAlbums: Saved', albums.length, 'albums to localStorage');
-    // Verify save worked
-    const verify = localStorage.getItem(ALBUMS_KEY);
-    if (verify !== data) {
-      console.error('saveAlbums: Verification failed! Data mismatch.');
-    }
+    checkBackupReminder();
   } catch (e) {
     console.error('Failed to save albums:', e);
     alert('Failed to save! ' + e.message);
   }
+}
+
+function countSaved() {
+  return albums.reduce((n, a) => n + a.artworks.length, 0);
 }
 
 // Backup functions
@@ -927,6 +1003,7 @@ function loadBackupInfo() {
   } catch (e) {
     console.error('Failed to load backup info:', e);
   }
+  if (backupInfo.savedAtLastBackup == null) backupInfo.savedAtLastBackup = 0;
 }
 
 function saveBackupInfo() {
@@ -937,9 +1014,19 @@ function saveBackupInfo() {
   }
 }
 
+// Remind based on saves (the part that can't be recreated), not on browsing:
+// after 10 new saves, or once saves have gone 3 days without a backup
+// (phone browsers can wipe site data after ~7 days away)
 function checkBackupReminder() {
-  const newSinceLast = seen.size - backupInfo.seenAtLastBackup;
-  if (newSinceLast >= BACKUP_REMINDER_THRESHOLD) {
+  const now = Date.now();
+  const newSinceLast = countSaved() - backupInfo.savedAtLastBackup;
+  if (newSinceLast <= 0) {
+    if (backupInfo.pendingSince) { backupInfo.pendingSince = null; saveBackupInfo(); }
+    return;
+  }
+  if (!backupInfo.pendingSince) { backupInfo.pendingSince = now; saveBackupInfo(); }
+  if (backupInfo.snoozedUntil && now < backupInfo.snoozedUntil) return;
+  if (newSinceLast >= BACKUP_REMINDER_THRESHOLD || now - backupInfo.pendingSince >= 3 * 86400000) {
     showBackupReminder(newSinceLast);
   }
 }
@@ -954,13 +1041,13 @@ function hideBackupReminder() {
 }
 
 function snoozeBackupReminder() {
-  // Snooze - set counter so reminder won't appear for another ~25 artworks
-  backupInfo.seenAtLastBackup = seen.size - Math.floor(BACKUP_REMINDER_THRESHOLD / 2);
+  backupInfo.snoozedUntil = Date.now() + 86400000; // ask again tomorrow
   saveBackupInfo();
   hideBackupReminder();
 }
 
-function exportData() {
+async function exportData() {
+  refreshAlbums();
   const data = {
     version: 1,
     exportDate: new Date().toISOString(),
@@ -968,46 +1055,84 @@ function exportData() {
     albums: albums
   };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `art-gallery-backup-${new Date().toISOString().split('T')[0]}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const json = JSON.stringify(data, null, 2);
+  const name = `art-gallery-backup-${new Date().toISOString().split('T')[0]}.json`;
+  const file = new File([json], name, { type: 'application/json' });
+
+  // On phones, use the share sheet so the backup can go to Files / iCloud
+  // Drive / email instead of a downloads folder that's easy to lose
+  const isTouch = 'ontouchstart' in window;
+  if (isTouch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+    } catch (e) {
+      if (e.name === 'AbortError') return; // cancelled: not backed up
+      downloadFile(file);
+    }
+  } else {
+    downloadFile(file);
+  }
 
   // Update backup info
   backupInfo.lastBackup = new Date().toISOString();
   backupInfo.seenAtLastBackup = seen.size;
+  backupInfo.savedAtLastBackup = countSaved();
+  backupInfo.pendingSince = null;
+  backupInfo.snoozedUntil = null;
   saveBackupInfo();
   updateBackupDisplay();
   hideBackupReminder();
 }
 
+function downloadFile(file) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Import MERGES into what's here and never removes anything, so restoring
+// an older backup can't erase newer saves
 function importData(file) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
+      let added = 0;
 
       if (data.seen && Array.isArray(data.seen)) {
-        seen = new Set(data.seen);
+        for (const id of data.seen) seen.add(id);
         saveSeen();
       }
 
       if (data.albums && Array.isArray(data.albums)) {
-        albums = data.albums;
-        saveAlbums();
+        updateAlbums(() => {
+          for (const inc of data.albums) {
+            if (!inc || !inc.id || !Array.isArray(inc.artworks)) continue;
+            let album = albums.find(a => a.id === inc.id);
+            if (!album) {
+              album = { id: inc.id, name: inc.name || 'Untitled', artworks: [] };
+              albums.push(album);
+            }
+            for (const id of inc.artworks) {
+              if (!album.artworks.includes(id)) {
+                album.artworks.push(id);
+                added++;
+              }
+            }
+            for (const [id, note] of Object.entries(inc.notes || {})) {
+              if (!album.notes) album.notes = {};
+              if (!album.notes[id]) album.notes[id] = note;
+            }
+          }
+        });
       }
 
-      // Update backup info
-      backupInfo.lastBackup = new Date().toISOString();
-      backupInfo.seenAtLastBackup = seen.size;
-      saveBackupInfo();
-
-      alert(`Imported successfully!\n- ${seen.size} artworks seen\n- ${albums.length} albums`);
+      alert(`Imported!\n- ${added} artwork${added !== 1 ? 's' : ''} added to albums\n- ${seen.size} artworks seen\nNothing already saved was removed.`);
 
       // Refresh UI
       applySort();
@@ -1024,10 +1149,10 @@ function importData(file) {
 
 function updateBackupDisplay() {
   const textEl = document.getElementById('last-backup-text');
+  const unsaved = Math.max(0, countSaved() - backupInfo.savedAtLastBackup);
   if (backupInfo.lastBackup) {
     const date = new Date(backupInfo.lastBackup);
-    const newSince = seen.size - backupInfo.seenAtLastBackup;
-    textEl.textContent = `Last backup: ${date.toLocaleDateString()} (${newSince} new since then)`;
+    textEl.textContent = `Last backup: ${date.toLocaleDateString()} (${unsaved} saved since then)`;
   } else {
     textEl.textContent = 'No backup yet - export your data to keep it safe!';
   }
@@ -1052,12 +1177,7 @@ function setupBackupControls() {
 
   // Reminder modal
   document.getElementById('close-backup-reminder').addEventListener('click', hideBackupReminder);
-  document.getElementById('reminder-later-btn').addEventListener('click', () => {
-    // Snooze - add half the threshold to delay next reminder
-    backupInfo.seenAtLastBackup = seen.size - Math.floor(BACKUP_REMINDER_THRESHOLD / 2);
-    saveBackupInfo();
-    hideBackupReminder();
-  });
+  document.getElementById('reminder-later-btn').addEventListener('click', snoozeBackupReminder);
 
   // Close backup reminder on backdrop click
   document.getElementById('backup-reminder').addEventListener('click', (e) => {
