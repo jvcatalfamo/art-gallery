@@ -23,6 +23,10 @@ let paintingsMap = {};
 let orderedList = [];
 let currentIndex = 0;
 let seen = new Set();
+// Shown during this visit: Back can return to these. Anything else already
+// in `seen` (earlier visits, another tab or device) is skipped.
+const shownThisVisit = new Set();
+let waitingForMore = false; // ran out of unseen paintings before the rest loaded
 
 // Albums: { id: string, name: string, artworks: number[] }
 let albums = [];
@@ -159,7 +163,8 @@ async function loadRestInBackground(pieces) {
         const added = addPaintings(await fetchJSON(SHARDS_DIR + 'art-' + n + '.json'));
         // Mix the new arrivals into what's still ahead (never what you've passed)
         const ahead = orderedList.slice(currentIndex + 1 + 5); // keep the 5 preloaded next
-        orderedList = [...orderedList.slice(0, currentIndex + 1 + 5), ...shuffle([...ahead, ...added])];
+        orderedList = [...orderedList.slice(0, currentIndex + 1 + 5), ...shuffle([...ahead, ...added.filter(isUnseen)])];
+        if (waitingForMore && orderedList[currentIndex]) { waitingForMore = false; showCurrentArtwork(); }
       } catch (e) {
         console.error('Failed to load piece', n, e);
         failed = true;
@@ -169,16 +174,27 @@ async function loadRestInBackground(pieces) {
   await worker(); // one piece at a time leaves room for the images
   allLoaded = !failed;
   console.log('Loaded ' + paintings.length + ' paintings');
+  if (waitingForMore) { waitingForMore = false; next(); }
   // Screens that needed the full list (saved paintings, stats) can fill in now
   if (albumsView.classList.contains('active')) renderAlbumsList();
   if (albumDetailView.classList.contains('active')) renderAlbumDetail();
   if (statsView.classList.contains('active')) renderStats();
 }
 
-// Sorting - always random
+// Sorting - always random, and only paintings you haven't seen yet
 function applySort() {
-  orderedList = shuffle([...paintings]);
+  orderedList = shuffle(paintings.filter(isUnseen));
   currentIndex = 0;
+}
+
+function isUnseen(p) {
+  return !seen.has(getPaintingId(p));
+}
+
+// Seen before this visit (Back still revisits what you saw this time)
+function seenBefore(p) {
+  const id = getPaintingId(p);
+  return seen.has(id) && !shownThisVisit.has(id);
 }
 
 function shuffle(arr) {
@@ -415,7 +431,18 @@ function showCurrentArtwork() {
   if (paintings.length === 0) return;
 
   const painting = orderedList[currentIndex];
-  if (!painting) return;
+  if (!painting) {
+    // Out of unseen paintings: either more are still loading, or that's all
+    if (allLoaded) showCompleteMessage();
+    else {
+      waitingForMore = true;
+      artworkImg.classList.remove('loaded');
+      loadingEl.textContent = 'Loading...';
+      loadingEl.classList.remove('hidden');
+    }
+    return;
+  }
+  hideCompleteMessage();
 
   // The save panel belongs to one painting; never leave it open on another
   savePanel.classList.add('hidden');
@@ -429,6 +456,7 @@ function showCurrentArtwork() {
     consecutiveFailures = 0;
     // Only count it as seen once it actually showed up
     seen.add(getPaintingId(painting));
+    shownThisVisit.add(getPaintingId(painting));
     saveSeen();
     artworkImg.dataset.full = cleanImageUrl(painting.image);
     artworkImg.src = url;
@@ -474,15 +502,20 @@ function hideCompleteMessage() {
 
 function next() {
   resetZoom();
-  currentIndex++;
-  if (currentIndex >= orderedList.length) currentIndex = 0;
+  if (currentIndex < orderedList.length) currentIndex++;
+  // Skip anything seen since the deck was dealt (another tab or device)
+  while (currentIndex < orderedList.length && seenBefore(orderedList[currentIndex])) currentIndex++;
+  // End of the deck: deal whatever's still unseen
+  if (currentIndex >= orderedList.length && allLoaded) {
+    orderedList = [...orderedList.slice(0, currentIndex), ...shuffle(paintings.filter(isUnseen))];
+  }
   showCurrentArtwork();
 }
 
 function prev() {
   resetZoom();
+  if (currentIndex === 0) return; // nothing earlier this visit
   currentIndex--;
-  if (currentIndex < 0) currentIndex = orderedList.length - 1;
   showCurrentArtwork();
 }
 
@@ -608,6 +641,7 @@ function setupControls() {
   // Reset
   resetBtn.addEventListener('click', () => {
     seen.clear();
+    shownThisVisit.clear();
     saveSeen(true);
     applySort();
     showCurrentArtwork();
